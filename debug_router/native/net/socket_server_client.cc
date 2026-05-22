@@ -9,10 +9,32 @@
 namespace debugrouter {
 namespace net {
 
+class SocketServerClientContext : public core::MessageTransceiverContext {
+ public:
+  SocketServerClientContext(
+      std::shared_ptr<debugrouter::socket_server::SocketServer> socket_server,
+      std::shared_ptr<debugrouter::socket_server::UsbClient> client)
+      : socket_server_(socket_server), client_(client) {}
+
+  void Send(const std::string &data) override {
+    auto socket_server = socket_server_.lock();
+    auto client = client_.lock();
+    if (!socket_server || !client) {
+      LOGI("SocketServerClientContext::Send target is gone.");
+      return;
+    }
+    socket_server->Send(data, client);
+  }
+
+ private:
+  std::weak_ptr<debugrouter::socket_server::SocketServer> socket_server_;
+  std::weak_ptr<debugrouter::socket_server::UsbClient> client_;
+};
+
 class ConnectionListener
     : public debugrouter::socket_server::SocketServerConnectionListener {
  public:
-  ConnectionListener(std::shared_ptr<core::MessageTransceiver> client)
+  ConnectionListener(std::shared_ptr<SocketServerClient> client)
       : client_(client) {}
   virtual ~ConnectionListener() = default;
   // LOGI error_code here.
@@ -50,25 +72,27 @@ class ConnectionListener
     }
   }
 
-  void OnMessage(const std::string &message) {
+  void OnMessage(std::shared_ptr<debugrouter::socket_server::UsbClient> source,
+                 const std::string &message) {
     if (auto client = client_.lock()) {
       core::MessageTransceiverDelegate *delegate = client->delegate();
       if (delegate == nullptr) {
         LOGE("OnMessage: delegate == nullptr, client is already offline.");
         return;
       }
-      delegate->OnMessage(message, client);
+      delegate->OnMessage(message, client, client->CreateContext(source));
     }
   }
 
  private:
-  std::weak_ptr<core::MessageTransceiver> client_;
+  std::weak_ptr<SocketServerClient> client_;
 };
 
 SocketServerClient::SocketServerClient() {}
 
 void SocketServerClient::Init() {
-  listener_ = std::make_shared<ConnectionListener>(shared_from_this());
+  listener_ = std::make_shared<ConnectionListener>(
+      std::static_pointer_cast<SocketServerClient>(shared_from_this()));
   socket_server_ = socket_server::SocketServer::CreateSocketServer(listener_);
   socket_server_->Init();
 }
@@ -83,6 +107,12 @@ core::ConnectionType SocketServerClient::GetType() {
 
 void SocketServerClient::Send(const std::string &data) {
   socket_server_->Send(data);
+}
+
+std::shared_ptr<core::MessageTransceiverContext>
+SocketServerClient::CreateContext(
+    const std::shared_ptr<socket_server::UsbClient> &client) {
+  return std::make_shared<SocketServerClientContext>(socket_server_, client);
 }
 
 void SocketServerClient::HandleReceivedMessage(const std::string &message) {

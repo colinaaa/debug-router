@@ -49,6 +49,23 @@ bool SocketServer::Send(const std::string &message) {
   return sent;
 }
 
+bool SocketServer::Send(const std::string &message,
+                        const std::shared_ptr<UsbClient> &client) {
+  if (!client) {
+    LOGI("SocketServerApi Send: target client is null.");
+    return false;
+  }
+  {
+    std::lock_guard<std::mutex> lock(clients_lock_);
+    if (std::find(usb_clients_.begin(), usb_clients_.end(), client) ==
+        usb_clients_.end()) {
+      LOGI("SocketServerApi Send: target client is not active.");
+      return false;
+    }
+  }
+  return client->Send(message);
+}
+
 void SocketServer::HandleOnOpenStatus(std::shared_ptr<UsbClient> client,
                                       int32_t code, const std::string &reason) {
   thread::DebugRouterExecutor::GetInstance().Post([=]() {
@@ -85,7 +102,7 @@ void SocketServer::HandleOnMessageStatus(std::shared_ptr<UsbClient> client,
       return;
     }
     if (auto listener = listener_.lock()) {
-      listener->OnMessage(message);
+      listener->OnMessage(client, message);
     }
   });
 }

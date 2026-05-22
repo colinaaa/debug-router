@@ -15,6 +15,12 @@ namespace core {
 
 class MessageTransceiver;
 
+class MessageTransceiverContext {
+ public:
+  virtual ~MessageTransceiverContext() = default;
+  virtual void Send(const std::string &data) = 0;
+};
+
 class MessageTransceiverDelegate {
  public:
   virtual void OnOpen(
@@ -25,7 +31,8 @@ class MessageTransceiverDelegate {
                          const std::string &error_message, int error_code) = 0;
   virtual void OnMessage(
       const std::string &message,
-      const std::shared_ptr<MessageTransceiver> &transceiver) = 0;
+      const std::shared_ptr<MessageTransceiver> &transceiver,
+      const std::shared_ptr<MessageTransceiverContext> &context) = 0;
   virtual void OnInit(const std::shared_ptr<MessageTransceiver> &transceiver,
                       int32_t code, const std::string &info) = 0;
 };
@@ -39,6 +46,8 @@ class MessageTransceiver
   virtual bool Connect(const std::string &url) = 0;
   virtual void Disconnect() = 0;
   virtual void Send(const std::string &data) = 0;
+  virtual void Send(const std::string &data,
+                    const std::shared_ptr<MessageTransceiverContext> &context);
   virtual ConnectionType GetType() = 0;
   virtual void HandleReceivedMessage(const std::string &message);
   virtual void SetDelegate(MessageTransceiverDelegate *delegate);

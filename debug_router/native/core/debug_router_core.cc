@@ -120,8 +120,10 @@ class MessageHandlerCore : public processor::MessageHandler {
     }
   }
 
-  void SendMessage(const std::string &message) override {
-    DebugRouterCore::GetInstance().Send(message);
+  void SendMessage(
+      const std::string &message,
+      const std::shared_ptr<MessageTransceiverContext> &context) override {
+    DebugRouterCore::GetInstance().Send(message, context);
   }
 
   void OpenCard(const std::string &url) override {
@@ -270,8 +272,14 @@ void DebugRouterCore::Connect(const std::string &url, const std::string &room,
 }
 
 void DebugRouterCore::Send(const std::string &message) {
+  Send(message, nullptr);
+}
+
+void DebugRouterCore::Send(
+    const std::string &message,
+    const std::shared_ptr<MessageTransceiverContext> &context) {
   if (connection_state_.load(std::memory_order_relaxed) == CONNECTED) {
-    current_transceiver_->Send(message);
+    current_transceiver_->Send(message, context);
   }
 }
 
@@ -549,12 +557,13 @@ void DebugRouterCore::OnFailure(
 
 void DebugRouterCore::OnMessage(
     const std::string &message,
-    const std::shared_ptr<MessageTransceiver> &transceiver) {
+    const std::shared_ptr<MessageTransceiver> &transceiver,
+    const std::shared_ptr<MessageTransceiverContext> &context) {
   if (transceiver != current_transceiver_) {
     return;
   }
   LOGI("DebugRouter OnMessage.");
-  processor_->Process(message);
+  processor_->Process(message, context);
 
   std::vector<std::shared_ptr<DebugRouterStateListener>> listeners;
   {

@@ -20,6 +20,8 @@ class SocketServerClient : public core::MessageTransceiver {
   void Send(const std::string &data) override;
   core::ConnectionType GetType() override;
   void HandleReceivedMessage(const std::string &message) override;
+  std::shared_ptr<core::MessageTransceiverContext> CreateContext(
+      const std::shared_ptr<socket_server::UsbClient> &client);
 
   void StartServer() override;
   void StopServer() override;

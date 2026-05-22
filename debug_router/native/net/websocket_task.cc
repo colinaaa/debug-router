@@ -433,7 +433,7 @@ void WebSocketTask::onMessage(const std::string &msg) {
   LOGI("WebSocketTask::onMessage");
   auto transceiver = transceiver_.lock();
   if (transceiver) {
-    transceiver->delegate()->OnMessage(msg, transceiver);
+    transceiver->delegate()->OnMessage(msg, transceiver, nullptr);
   }
 }
 }  // namespace net

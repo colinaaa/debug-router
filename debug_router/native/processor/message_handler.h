@@ -5,10 +5,14 @@
 #ifndef DEBUGROUTER_NATIVE_PROCESSOR_MESSAGE_HANDLER_H_
 #define DEBUGROUTER_NATIVE_PROCESSOR_MESSAGE_HANDLER_H_
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 
 namespace debugrouter {
+namespace core {
+class MessageTransceiverContext;
+}
 namespace processor {
 
 class MessageHandler {
@@ -19,7 +23,9 @@ class MessageHandler {
   virtual std::unordered_map<int, std::string> GetSessionList() = 0;
   virtual void OnMessage(const std::string &type, int session_id,
                          const std::string &message) = 0;
-  virtual void SendMessage(const std::string &message) = 0;
+  virtual void SendMessage(
+      const std::string &message,
+      const std::shared_ptr<core::MessageTransceiverContext> &context) = 0;
   virtual void OpenCard(const std::string &url) = 0;
   virtual std::string HandleAppAction(const std::string &method,
                                       const std::string &params) = 0;

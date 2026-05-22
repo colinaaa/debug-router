@@ -24,7 +24,8 @@ class SocketServerConnectionListener {
   virtual void OnInit(int32_t code, const std::string &info) = 0;
   virtual void OnStatusChanged(ConnectionStatus status, int32_t code,
                                const std::string &info) = 0;
-  virtual void OnMessage(const std::string &message) = 0;
+  virtual void OnMessage(std::shared_ptr<UsbClient> client,
+                         const std::string &message) = 0;
 };
 
 class SocketServer : public std::enable_shared_from_this<SocketServer> {
@@ -35,6 +36,8 @@ class SocketServer : public std::enable_shared_from_this<SocketServer> {
 
   void Init();
   bool Send(const std::string &message);
+  bool Send(const std::string &message,
+            const std::shared_ptr<UsbClient> &client);
   void Disconnect();
 
   void HandleOnOpenStatus(std::shared_ptr<UsbClient> client, int32_t code,

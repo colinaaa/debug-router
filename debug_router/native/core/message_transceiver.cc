@@ -10,8 +10,18 @@ MessageTransceiver::MessageTransceiver() {}
 
 void MessageTransceiver::HandleReceivedMessage(const std::string &message) {
   if (delegate_) {
-    delegate_->OnMessage(message, shared_from_this());
+    delegate_->OnMessage(message, shared_from_this(), nullptr);
   }
+}
+
+void MessageTransceiver::Send(
+    const std::string &data,
+    const std::shared_ptr<MessageTransceiverContext> &context) {
+  if (context) {
+    context->Send(data);
+    return;
+  }
+  Send(data);
 }
 
 void MessageTransceiver::SetDelegate(MessageTransceiverDelegate *delegate) {

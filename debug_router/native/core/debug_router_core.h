@@ -73,7 +73,8 @@ class DebugRouterCore : public MessageTransceiverDelegate {
                          int error_code) override;
   virtual void OnMessage(
       const std::string &message,
-      const std::shared_ptr<MessageTransceiver> &transceiver) override;
+      const std::shared_ptr<MessageTransceiver> &transceiver,
+      const std::shared_ptr<MessageTransceiverContext> &context) override;
 
   virtual void OnInit(const std::shared_ptr<MessageTransceiver> &transceiver,
                       int32_t code, const std::string &info) override;
@@ -85,6 +86,8 @@ class DebugRouterCore : public MessageTransceiverDelegate {
   void DisconnectAsync();
 
   void Send(const std::string &message);
+  void Send(const std::string &message,
+            const std::shared_ptr<MessageTransceiverContext> &context);
 
   void SendAsync(const std::string &message);
 

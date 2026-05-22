@@ -40,7 +40,9 @@ class RecordingSocketServerListener final
     status_events.push_back({status, code, info});
   }
 
-  void OnMessage(const std::string &message) override {
+  void OnMessage(std::shared_ptr<UsbClient> client,
+                 const std::string &message) override {
+    message_clients.push_back(client);
     messages.push_back(message);
   }
 
@@ -48,6 +50,7 @@ class RecordingSocketServerListener final
   std::vector<std::string> init_infos;
   std::vector<StatusEvent> status_events;
   std::vector<std::string> messages;
+  std::vector<std::shared_ptr<UsbClient>> message_clients;
 };
 
 class TestSocketServer final : public SocketServer {
@@ -172,6 +175,8 @@ TEST_F(SocketServerMultiplexTest, ForwardsMessagesOnlyFromActiveClients) {
 
   ASSERT_EQ(listener_->messages.size(), 1u);
   EXPECT_EQ(listener_->messages[0], "active-message");
+  ASSERT_EQ(listener_->message_clients.size(), 1u);
+  EXPECT_EQ(listener_->message_clients[0], active);
 }
 
 TEST_F(SocketServerMultiplexTest,
