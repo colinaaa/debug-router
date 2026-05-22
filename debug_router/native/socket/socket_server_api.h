@@ -9,6 +9,7 @@
 #include <queue>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "debug_router/native/log/logging.h"
 #include "debug_router/native/socket/count_down_latch.h"
@@ -69,8 +70,8 @@ class SocketServer : public std::enable_shared_from_this<SocketServer> {
   std::condition_variable queue_available_;
   std::unique_ptr<CountDownLatch> latch_;
   std::mutex queue_lock_;
-  std::shared_ptr<UsbClient> usb_client_;
-  std::shared_ptr<UsbClient> temp_usb_client_;
+  std::vector<std::shared_ptr<UsbClient>> usb_clients_;
+  std::mutex clients_lock_;
 
   volatile SocketType socket_fd_ = kInvalidSocket;
 

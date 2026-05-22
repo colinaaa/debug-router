@@ -75,14 +75,13 @@ int32_t SocketServerWin::InitSocket() {
 }
 
 void SocketServerWin::Start() {
-  int32_t port = kInvalidPort;
   if (socket_fd_ == kInvalidSocket) {
-    port = InitSocket();
+    int32_t port = InitSocket();
     if (port == kInvalidPort) {
       return;
     }
+    NotifyInit(0, "port:" + std::to_string(port));
   }
-  NotifyInit(0, "port:" + std::to_string(port));
   LOGI("server socket:" << socket_fd_);
   SocketType accept_socket_fd = accept(socket_fd_, NULL, NULL);
   if (accept_socket_fd == kInvalidSocket) {

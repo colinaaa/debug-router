@@ -8,6 +8,9 @@
 #else
 #include "debug_router/native/socket/posix/socket_server_posix.h"
 #endif
+
+#include <algorithm>
+
 #include "debug_router/native/core/util.h"
 #include "debug_router/native/thread/debug_router_executor.h"
 
@@ -25,28 +28,45 @@ std::shared_ptr<SocketServer> SocketServer::CreateSocketServer(
 
 SocketServer::SocketServer(
     const std::shared_ptr<SocketServerConnectionListener> &listener)
-    : listener_(listener), usb_client_(nullptr) {}
+    : listener_(listener) {}
 
 bool SocketServer::Send(const std::string &message) {
-  if (!usb_client_) {
-    LOGI("SocketServerApi Send: client is null.");
+  std::vector<std::shared_ptr<UsbClient>> clients;
+  {
+    std::lock_guard<std::mutex> lock(clients_lock_);
+    clients = usb_clients_;
+  }
+  if (clients.empty()) {
+    LOGI("SocketServerApi Send: clients is empty.");
     return false;
   }
-  return usb_client_->Send(message);
+  bool sent = false;
+  for (const auto &client : clients) {
+    if (client) {
+      sent = client->Send(message) || sent;
+    }
+  }
+  return sent;
 }
 
 void SocketServer::HandleOnOpenStatus(std::shared_ptr<UsbClient> client,
                                       int32_t code, const std::string &reason) {
   thread::DebugRouterExecutor::GetInstance().Post([=]() {
-    std::shared_ptr<UsbClient> old_client_ = usb_client_;
-    LOGI("SocketServerApi OnOpen: replace old client.");
-    if (old_client_) {
-      LOGI("SocketServerApi HandleOnOpenStatus: stop old client.");
-      old_client_->Stop();
+    bool should_notify_connected = false;
+    {
+      std::lock_guard<std::mutex> lock(clients_lock_);
+      auto it = std::find(usb_clients_.begin(), usb_clients_.end(), client);
+      if (it == usb_clients_.end()) {
+        should_notify_connected = usb_clients_.empty();
+        usb_clients_.push_back(client);
+      }
+      LOGI("SocketServerApi OnOpen: active client count:"
+           << usb_clients_.size());
     }
-    usb_client_ = client;
-    if (auto listener = listener_.lock()) {
-      listener->OnStatusChanged(kConnected, code, reason);
+    if (should_notify_connected) {
+      if (auto listener = listener_.lock()) {
+        listener->OnStatusChanged(kConnected, code, reason);
+      }
     }
   });
 }
@@ -54,8 +74,14 @@ void SocketServer::HandleOnOpenStatus(std::shared_ptr<UsbClient> client,
 void SocketServer::HandleOnMessageStatus(std::shared_ptr<UsbClient> client,
                                          const std::string &message) {
   thread::DebugRouterExecutor::GetInstance().Post([=]() {
-    if (!usb_client_ || usb_client_ != client) {
-      LOGI("SocketServerApi OnMessage: client is null or not match.");
+    bool is_active_client = false;
+    {
+      std::lock_guard<std::mutex> lock(clients_lock_);
+      is_active_client = std::find(usb_clients_.begin(), usb_clients_.end(),
+                                   client) != usb_clients_.end();
+    }
+    if (!is_active_client) {
+      LOGI("SocketServerApi OnMessage: client is not active.");
       return;
     }
     if (auto listener = listener_.lock()) {
@@ -68,21 +94,30 @@ void SocketServer::HandleOnCloseStatus(std::shared_ptr<UsbClient> client,
                                        ConnectionStatus status, int32_t code,
                                        const std::string &reason) {
   thread::DebugRouterExecutor::GetInstance().Post([=]() {
-    if (!usb_client_ || usb_client_ != client) {
-      LOGI(
-          "SocketServerApi OnClose: curr client is null or not match, stop "
-          "error client.");
+    bool should_notify_disconnected = false;
+    bool is_active_client = false;
+    {
+      std::lock_guard<std::mutex> lock(clients_lock_);
+      auto it = std::find(usb_clients_.begin(), usb_clients_.end(), client);
+      if (it != usb_clients_.end()) {
+        is_active_client = true;
+        usb_clients_.erase(it);
+        should_notify_disconnected = usb_clients_.empty();
+      }
+      LOGI("SocketServerApi OnClose: active client count:"
+           << usb_clients_.size());
+    }
+    if (!is_active_client) {
+      LOGI("SocketServerApi OnClose: client is not active.");
       client->Stop();
+      return;
+    }
+    LOGI("SocketServerApi HandleOnCloseStatus: close client for OnClose.");
+    client->Stop();
+    if (should_notify_disconnected) {
       if (auto listener = listener_.lock()) {
         listener->OnStatusChanged(status, code, reason);
       }
-      return;
-    }
-    LOGI("SocketServerApi HandleOnCloseStatus: close curr client for OnClose.");
-    usb_client_->Stop();
-    usb_client_ = nullptr;
-    if (auto listener = listener_.lock()) {
-      listener->OnStatusChanged(status, code, reason);
     }
   });
 }
@@ -91,18 +126,30 @@ void SocketServer::HandleOnErrorStatus(std::shared_ptr<UsbClient> client,
                                        ConnectionStatus status, int32_t code,
                                        const std::string &reason) {
   thread::DebugRouterExecutor::GetInstance().Post([=]() {
-    if (!usb_client_ || usb_client_ != client) {
-      LOGI(
-          "SocketServerApi OnError: client is null or not match, stop error "
-          "client.");
+    bool should_notify_error = false;
+    bool is_active_client = false;
+    {
+      std::lock_guard<std::mutex> lock(clients_lock_);
+      auto it = std::find(usb_clients_.begin(), usb_clients_.end(), client);
+      if (it != usb_clients_.end()) {
+        is_active_client = true;
+        usb_clients_.erase(it);
+        should_notify_error = usb_clients_.empty();
+      }
+      LOGI("SocketServerApi OnError: active client count:"
+           << usb_clients_.size());
+    }
+    if (!is_active_client) {
+      LOGI("SocketServerApi OnError: client is not active.");
       client->Stop();
       return;
     }
-    LOGI("SocketServerApi HandleOnErrorStatus: close curr client for OnError.");
-    usb_client_->Stop();
-    usb_client_ = nullptr;
-    if (auto listener = listener_.lock()) {
-      listener->OnStatusChanged(status, code, reason);
+    LOGI("SocketServerApi HandleOnErrorStatus: close client for OnError.");
+    client->Stop();
+    if (should_notify_error) {
+      if (auto listener = listener_.lock()) {
+        listener->OnStatusChanged(status, code, reason);
+      }
     }
   });
 }
@@ -137,11 +184,15 @@ void SocketServer::StopServer() {
   }
 
   Close();
-  if (usb_client_) {
-    usb_client_->Stop();
+  std::vector<std::shared_ptr<UsbClient>> clients;
+  {
+    std::lock_guard<std::mutex> lock(clients_lock_);
+    clients = usb_clients_;
   }
-  if (temp_usb_client_) {
-    temp_usb_client_->Stop();
+  for (const auto &client : clients) {
+    if (client) {
+      client->Stop();
+    }
   }
 }
 
@@ -175,21 +226,33 @@ void SocketServer::Close() {
 
 void SocketServer::Disconnect() {
   thread::DebugRouterExecutor::GetInstance().Post([=]() {
-    if (usb_client_) {
-      LOGI("SocketServerApi Disconnect: stop curr client.");
-      usb_client_->Stop();
-      usb_client_ = nullptr;
+    std::vector<std::shared_ptr<UsbClient>> clients;
+    {
+      std::lock_guard<std::mutex> lock(clients_lock_);
+      clients = usb_clients_;
+    }
+    if (!clients.empty()) {
+      LOGI("SocketServerApi Disconnect: stop all clients.");
+      for (const auto &client : clients) {
+        if (client) {
+          client->Stop();
+        }
+      }
     }
   });
 }
 
 SocketServer::~SocketServer() {
   LOGI("SocketServer::~SocketServer");
-  if (usb_client_) {
-    usb_client_->Stop();
+  std::vector<std::shared_ptr<UsbClient>> clients;
+  {
+    std::lock_guard<std::mutex> lock(clients_lock_);
+    clients.swap(usb_clients_);
   }
-  if (temp_usb_client_) {
-    temp_usb_client_->Stop();
+  for (const auto &client : clients) {
+    if (client) {
+      client->Stop();
+    }
   }
   Close();
 }
