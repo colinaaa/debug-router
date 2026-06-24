@@ -1,0 +1,27 @@
+test/e2e_test/android_example/scripts/debug_router_usb_benchmark_test.py
+  s_7f857100432e15::t_8f1a592b657a26 1-63
+test/e2e_test/android_example/scripts/debug_router_usb_benchmark.py
+  s_7f857100432e15::t_04caa12edea5e2 184-217
+  s_7f857100432e15::t_b071913c80e286 697-703,747-752,761-767
+  s_7f857100432e15::t_2992e08fa59a1a 589,591-593,597,605,608,611-621,627,629,633-637
+  s_7f857100432e15::t_e0db0d38d4d855 26,94-145
+  s_7f857100432e15::t_a5588974cb0b78 807-811
+test/e2e_test/android_example/app/src/main/java/com/lynx/debugrouter/testapp/MainActivity.java
+  s_7f857100432e15::t_c29b590a3fce8f 21-22,26,144-146,153-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "eddb1e7122179cf9ae990e0ea0d4a99b4ac9dee6",
+  "prompts": {},
+  "sessions": {
+    "s_7f857100432e15": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ef8d9-c3ee-7000-8d8b-0b82fc6a397f",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Qingyu Wang <wangqingyu.c0l1n@bytedance.com>"
+    }
+  }
+}
