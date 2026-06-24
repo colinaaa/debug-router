@@ -1,0 +1,42 @@
+debug_router/native/socket/socket_server_api.h
+  s_4a7975800346bb::t_f8e0e116023afe 110
+  s_4a7975800346bb::t_3deaceebad0ea2 12
+  s_4a7975800346bb::t_9860fff26a9ad5 80
+  s_4a7975800346bb::t_70daf6edccb3e2 65
+  s_4a7975800346bb::t_37addd3c0ad7bd 79
+  s_4a7975800346bb::t_045a1b54a0591b 66
+  s_4a7975800346bb::t_dfe3fd397220b6 95
+debug_router/native/socket/posix/socket_server_posix.cc
+  s_4a7975800346bb::t_dfe3fd397220b6 99-100,107-108
+  s_4a7975800346bb::t_9860fff26a9ad5 102
+debug_router/native/socket/win/socket_server_win.cc
+  s_4a7975800346bb::t_dfe3fd397220b6 94-95,102-103
+  s_4a7975800346bb::t_9860fff26a9ad5 97
+debug_router/native/socket/socket_server_api.cc
+  s_4a7975800346bb::t_9860fff26a9ad5 202-203,231-233,253-254
+  s_4a7975800346bb::t_045a1b54a0591b 42-43,67-69,83-85,121-123,170,173
+  s_4a7975800346bb::t_f8e0e116023afe 44,46,49-51,55,100,138
+  s_4a7975800346bb::t_27c2462a9e0aa6 45,47-48,52-54,56-62,70-77,86-99,101-115,124-137,139-150
+  s_4a7975800346bb::t_70daf6edccb3e2 30,167,169,171-172,174-176
+debug_router/native/test/usb_reconnect_race_unittest.cc
+  s_4a7975800346bb::t_a8168525a8a0ec 8-17,61,76,78,86-88,90-231,245,261,265,279,285,308,375,385,394,407,421,428,433-435,437,439-441,454,467,469-482,484-516,519,531
+  s_4a7975800346bb::t_3deaceebad0ea2 20
+  s_4a7975800346bb::t_9860fff26a9ad5 292-307,483
+  s_4a7975800346bb::t_f8e0e116023afe 240-244
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "8afbcc75a12daf1a544fadafb24b1b43ea3682d9",
+  "prompts": {},
+  "sessions": {
+    "s_4a7975800346bb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ef9a4-db92-7ee2-9940-a484b1243155",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Qingyu Wang <wangqingyu.c0l1n@bytedance.com>"
+    }
+  }
+}
