@@ -15,16 +15,21 @@ const char *kDebugRouterErrorMessage = "DebugRouterError";
 const int kDebugRouterErrorCode = -3;
 
 Processor::Processor(std::unique_ptr<MessageHandler> message_handler)
-    : message_handler_(std::move(message_handler)), is_reconnect_(false) {}
+    : message_handler_(std::move(message_handler)) {}
 
 void Processor::Process(const std::string &message) {
+  Process(message, default_context_);
+}
+
+void Processor::Process(const std::string &message,
+                        ClientProtocolContext &context) {
   Json::Reader reader;
   Json::Value root;
 #if __cpp_exceptions >= 199711L
   try {
 #endif
     reader.parse(message, root);
-    process(root);
+    process(root, context);
 #if __cpp_exceptions >= 199711L
   } catch (const std::exception &e) {
     std::string error_message;
@@ -36,7 +41,8 @@ void Processor::Process(const std::string &message) {
 #endif
 }
 
-void Processor::process(const Json::Value &root) {
+void Processor::process(const Json::Value &root,
+                        ClientProtocolContext &context) {
   std::shared_ptr<protocol::RemoteDebugProtocolBody> body =
       protocol::RemoteDebugProtocol::Parse(root);
   if (!body) {
@@ -45,37 +51,37 @@ void Processor::process(const Json::Value &root) {
 
   if (body->IsProtocolBody4Init()) {
     auto init_data = body->AsInit();
-    client_id_ = init_data->client_id_;
-    if (client_id_ > 0) {
+    context.client_id = init_data->client_id_;
+    if (context.client_id > 0) {
       LOGI("registerDevice");
-      registerDevice();
+      registerDevice(context);
     }
   } else if (body->IsProtocolBody4Registered()) {
     LOGI("joinRoom");
     joinRoom();
   } else if (body->IsProtocolBody4RoomJoined()) {
     LOGI("get sessionList");
-    sessionList();
+    sessionList(context);
   } else if (body->IsProtocolBody4ChangeRoomServer()) {
     LOGI("changeRoomServer");
     auto server_data = body->AsChangeRoomServer();
-    changeRoomServer(server_data->url_, server_data->room_id_);
+    changeRoomServer(server_data->url_, server_data->room_id_, context);
   } else if (body->IsProtocolBody4Custom()) {
     auto custom = body->AsCustom();
     if (custom->Is4CDP()) {
       auto cdp = custom->AsCDP();
-      if (cdp->client_id_ == client_id_) {
+      if (cdp->client_id_ == context.client_id) {
         LOGI("CDP Message %s" << cdp->message_.c_str());
         processMessage("CDP", cdp->session_id_, cdp->message_);
       }
     } else if (custom->Is4D2RStopAtEntry()) {
-      if (custom->client_id_ == client_id_) {
+      if (custom->client_id_ == context.client_id) {
         processMessage(
             protocol::kRemoteDebugProtocolBodyData4Custom4D2RStopAtEntry, -1,
             custom->AsD2RStopAtEntry() ? "true" : "false");
       }
     } else if (custom->Is4D2RStopLepusAtEntry()) {
-      if (custom->client_id_ == client_id_) {
+      if (custom->client_id_ == context.client_id) {
         processMessage(
             protocol::kRemoteDebugProtocolBodyData4Custom4D2RStopLepusAtEntry,
             -1, custom->AsD2RStopLepusAtEntry() ? "true" : "false");
@@ -85,14 +91,14 @@ void Processor::process(const Json::Value &root) {
       openCard(custom->AsOpenCardData()->url);
     } else if (custom->Is4ListSession()) {
       LOGI("FlushSessionList");
-      FlushSessionList();
+      FlushSessionList(context);
     } else if (custom->Is4MessageHandler()) {
       LOGI("HandleAppAction");
-      HandleAppAction(custom);
+      HandleAppAction(custom, context);
     } else {
       LOGI("extension");
       auto ext = custom->AsExtension();
-      if (ext->client_id_ == client_id_) {
+      if (ext->client_id_ == context.client_id) {
         processMessage(custom->type_, ext->session_id_, ext->message_);
       }
     }
@@ -100,11 +106,12 @@ void Processor::process(const Json::Value &root) {
 }
 
 std::string Processor::wrapStopAtEntryMessage(
-    const std::string &type, const std::string &message) const {
+    const std::string &type, const std::string &message,
+    const ClientProtocolContext &context) const {
   bool stop = (message == "true");
   std::shared_ptr<protocol::RemoteDebugProtocolBody> custom =
-      protocol::RemoteDebugProtocol::CreateProtocolBody4Custom(type, client_id_,
-                                                               stop);
+      protocol::RemoteDebugProtocol::CreateProtocolBody4Custom(
+          type, context.client_id, stop);
   return protocol::RemoteDebugProtocol::Stringify(custom);
 }
 
@@ -112,36 +119,48 @@ std::string Processor::WrapCustomizedMessage(const std::string &type,
                                              int session_id,
                                              const std::string &message,
                                              int mark, bool isObject) {
+  return WrapCustomizedMessage(type, session_id, message, mark, isObject,
+                               default_context_);
+}
+
+std::string Processor::WrapCustomizedMessage(
+    const std::string &type, int session_id, const std::string &message,
+    int mark, bool isObject, const ClientProtocolContext &context) {
   // handle legacy message type
   if (type == protocol::kRemoteDebugProtocolBodyData4Custom4R2DStopAtEntry ||
       type ==
           protocol::kRemoteDebugProtocolBodyData4Custom4R2DStopLepusAtEntry) {
-    return wrapStopAtEntryMessage(type, message);
+    return wrapStopAtEntryMessage(type, message, context);
   }
 
   std::shared_ptr<protocol::CustomData4CDP> cdp_data =
       std::make_shared<protocol::CustomData4CDP>();
-  cdp_data->client_id_ = client_id_;
+  cdp_data->client_id_ = context.client_id;
   cdp_data->session_id_ = session_id;
   cdp_data->message_ = message;
   cdp_data->is_object_ = isObject;
   std::shared_ptr<protocol::RemoteDebugProtocolBody> custom =
-      protocol::RemoteDebugProtocol::CreateProtocolBody4Custom(type, client_id_,
-                                                               cdp_data);
+      protocol::RemoteDebugProtocol::CreateProtocolBody4Custom(
+          type, context.client_id, cdp_data);
   return protocol::RemoteDebugProtocol::Stringify(custom, mark);
 }
 
-void Processor::FlushSessionList() { sessionList(); }
+void Processor::FlushSessionList() { sessionList(default_context_); }
 
-void Processor::SetIsReconnect(bool is_reconnect) {
-  is_reconnect_ = is_reconnect;
+void Processor::FlushSessionList(const ClientProtocolContext &context) {
+  sessionList(context);
 }
 
-void Processor::registerDevice() {
+void Processor::SetIsReconnect(bool is_reconnect) {
+  default_context_.is_reconnect = is_reconnect;
+}
+
+void Processor::registerDevice(const ClientProtocolContext &context) {
   if (message_handler_) {
     std::shared_ptr<protocol::RemoteDebugProtocolBody> body =
         protocol::RemoteDebugProtocol::CreateProtocolBody4Register(
-            client_id_, message_handler_->GetClientInfo(), is_reconnect_);
+            context.client_id, message_handler_->GetClientInfo(),
+            context.is_reconnect);
     message_handler_->SendMessage(
         protocol::RemoteDebugProtocol::Stringify(body));
   }
@@ -164,7 +183,7 @@ void Processor::reportError(const std::string &error) {
   }
 }
 
-void Processor::sessionList() {
+void Processor::sessionList(const ClientProtocolContext &context) {
   if (message_handler_) {
     std::unique_ptr<protocol::CustomData4SessionList> session_list =
         std::make_unique<protocol::CustomData4SessionList>();
@@ -191,18 +210,19 @@ void Processor::sessionList() {
     std::shared_ptr<protocol::RemoteDebugProtocolBody> body =
         protocol::RemoteDebugProtocol::CreateProtocolBody4Custom(
             protocol::kRemoteDebugProtocolBodyData4Custom4SessionList,
-            client_id_, std::move(session_list));
+            context.client_id, std::move(session_list));
     message_handler_->SendMessage(
         protocol::RemoteDebugProtocol::Stringify(body));
   }
 }
 
 void Processor::changeRoomServer(const std::string &url,
-                                 const std::string &room) {
+                                 const std::string &room,
+                                 const ClientProtocolContext &context) {
   if (message_handler_) {
     std::shared_ptr<protocol::RemoteDebugProtocolBody> body =
         protocol::RemoteDebugProtocol::CreateProtocolBody4ChangeRoomServerAck(
-            client_id_);
+            context.client_id);
     message_handler_->SendMessage(
         protocol::RemoteDebugProtocol::Stringify(body));
 
@@ -218,7 +238,8 @@ void Processor::openCard(const std::string &url) {
 
 void Processor::HandleAppAction(
     const std::shared_ptr<protocol::RemoteDebugProtocolBodyData4Custom>
-        custom_data) {
+        custom_data,
+    const ClientProtocolContext &context) {
   std::string result = kDebugRouterErrorMessage;
   auto app_message_data = custom_data->app_protocol_data_->app_message_data_;
   if (message_handler_) {
@@ -242,7 +263,7 @@ void Processor::HandleAppAction(
         method, id, error.toStyledString(), protocol::kError);
   }
   auto app_protocol_data = std::make_shared<protocol::AppProtocolData>(
-      client_id_, app_message_data_result);
+      context.client_id, app_message_data_result);
   auto body_result =
       protocol::RemoteDebugProtocol::CreateProtocolBody4AppMessage(
           protocol::kRemoteDebugProtocolBodyData4Custom4MessageHandler,
