@@ -27,6 +27,9 @@ namespace debugrouter {
 
 namespace core {
 
+thread_local std::shared_ptr<MessageTransceiverContext>
+    DebugRouterCore::current_message_context_ = nullptr;
+
 class MessageHandlerCore : public processor::MessageHandler {
  public:
   MessageHandlerCore() {}

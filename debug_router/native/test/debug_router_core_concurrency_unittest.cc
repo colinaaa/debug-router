@@ -3,6 +3,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <atomic>
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
@@ -34,6 +35,39 @@ class TestSessionHandler : public DebugRouterSessionHandler {
   void OnSessionDestroy(int session_id) override {}
   void OnMessage(const std::string &message, const std::string &type,
                  int session_id) override {}
+};
+
+class BlockingMessageHandler final : public DebugRouterMessageHandler {
+ public:
+  std::string Handle(std::string params) override {
+    std::unique_lock<std::mutex> lock(mutex_);
+    int order = ++entered_count_;
+    entered_cv_.notify_all();
+    release_cv_.wait(lock, [&]() { return release_count_ >= order; });
+    return "{\"ok\":true}";
+  }
+
+  std::string GetName() const override { return "BlockingMethod"; }
+
+  void WaitForEnteredCount(int count) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    entered_cv_.wait(lock, [&]() { return entered_count_ >= count; });
+  }
+
+  void ReleaseNext() {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      ++release_count_;
+    }
+    release_cv_.notify_all();
+  }
+
+ private:
+  std::mutex mutex_;
+  std::condition_variable entered_cv_;
+  std::condition_variable release_cv_;
+  int entered_count_ = 0;
+  int release_count_ = 0;
 };
 
 class TestNativeSlot final : public NativeSlot {
@@ -81,6 +115,7 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
     ClearSlots();
     ClearGlobalHandlers();
     ClearSessionHandlers();
+    ClearMessageHandlers();
     core_->ClearProcessorContexts();
   }
 
@@ -88,6 +123,7 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
     ClearSlots();
     ClearGlobalHandlers();
     ClearSessionHandlers();
+    ClearMessageHandlers();
     core_->ClearProcessorContexts();
   }
 
@@ -111,6 +147,8 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
     std::unique_lock lock(core_->session_handler_mutex_);
     core_->session_handler_map_.clear();
   }
+
+  void ClearMessageHandlers() { core_->message_handlers_.clear(); }
 
   size_t GetSessionHandlerCount() {
     std::shared_lock lock(core_->session_handler_mutex_);
@@ -140,6 +178,24 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
 std::string InitMessage(protocol::RemoteDebugPrococolClientId client_id) {
   return protocol::RemoteDebugProtocol::Stringify(
       protocol::RemoteDebugProtocol::CreateProtocolBody4Init(client_id));
+}
+
+std::string AppActionMessage(protocol::RemoteDebugPrococolClientId client_id,
+                             int32_t message_id) {
+  Json::Value root(Json::objectValue);
+  root[protocol::kKeyEvent] = protocol::kRemoteDebugServerEvent4Custom;
+  root[protocol::kKeyData][protocol::kKeyType] =
+      protocol::kRemoteDebugProtocolBodyData4Custom4MessageHandler;
+  root[protocol::kKeyData][protocol::kKeySender] = client_id;
+  root[protocol::kKeyData][protocol::kKeyData][protocol::kKeyClientId] =
+      client_id;
+  root[protocol::kKeyData][protocol::kKeyData][protocol::kKeyMessage]
+      [protocol::kKeyMethod] = "BlockingMethod";
+  root[protocol::kKeyData][protocol::kKeyData][protocol::kKeyMessage]
+      [protocol::kKeyId] = message_id;
+  root[protocol::kKeyData][protocol::kKeyData][protocol::kKeyMessage]
+      [protocol::kKeyParams]["request_id"] = message_id;
+  return root.toStyledString();
 }
 
 TEST_F(DebugRouterCoreConcurrencyTest, SendUsesTransceiverContextWhenProvided) {
@@ -274,6 +330,52 @@ TEST_F(DebugRouterCoreConcurrencyTest, ConcurrentSendDataAndContextUpdates) {
 
   EXPECT_EQ(core_->TransceiverContextCountForTest(), 1U);
   EXPECT_GE(core_->GetProcessorContextForTest(context).client_id, 800U);
+
+  core_->OnClosed(transceiver);
+  SetCurrentTransceiver(previous_transceiver);
+  SetCurrentConnectionState(previous_state);
+}
+
+TEST_F(DebugRouterCoreConcurrencyTest,
+       ConcurrentRepliesUseThreadLocalMessageContext) {
+  auto previous_transceiver = GetCurrentTransceiver();
+  ConnectionState previous_state = GetCurrentConnectionState();
+  auto transceiver = std::make_shared<ContextRecordingTransceiver>();
+  auto first_context = std::make_shared<TestMessageContext>();
+  auto second_context = std::make_shared<TestMessageContext>();
+  BlockingMessageHandler handler;
+  core_->AddMessageHandler(&handler);
+  SetCurrentTransceiver(transceiver);
+  SetCurrentConnectionState(CONNECTED);
+  core_->GetProcessorContextForTest(first_context).client_id = 901;
+  core_->GetProcessorContextForTest(second_context).client_id = 902;
+
+  std::thread first([&]() {
+    core_->OnMessage(AppActionMessage(901, 1), transceiver, first_context);
+  });
+  handler.WaitForEnteredCount(1);
+  std::thread second([&]() {
+    core_->OnMessage(AppActionMessage(902, 2), transceiver, second_context);
+  });
+  handler.WaitForEnteredCount(2);
+
+  handler.ReleaseNext();
+  first.join();
+  handler.ReleaseNext();
+  second.join();
+
+  ASSERT_EQ(transceiver->context_sends.size(), 2U);
+  std::unordered_map<uint32_t, std::shared_ptr<MessageTransceiverContext>>
+      sent_contexts_by_sender;
+  for (const auto &send : transceiver->context_sends) {
+    Json::Value root;
+    Json::Reader reader;
+    ASSERT_TRUE(reader.parse(send.first, root));
+    sent_contexts_by_sender[root[protocol::kKeyData][protocol::kKeySender]
+                                .asUInt()] = send.second;
+  }
+  EXPECT_EQ(sent_contexts_by_sender[901], first_context);
+  EXPECT_EQ(sent_contexts_by_sender[902], second_context);
 
   core_->OnClosed(transceiver);
   SetCurrentTransceiver(previous_transceiver);
