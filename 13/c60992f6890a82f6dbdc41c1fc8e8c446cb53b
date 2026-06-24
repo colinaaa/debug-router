@@ -1,0 +1,56 @@
+debug_router/native/socket/work_thread_executor.cc
+  s_7f857100432e15::t_92f7572498129c 11-17,82-84,110-117,119
+debug_router/native/test/usb_client_resource_unittest.cc
+  s_7f857100432e15::t_92f7572498129c 1-16,18,24-25,31-34,36-37,39-43
+  s_7f857100432e15::t_844d2a9d880979 26-28
+  s_7f857100432e15::t_3d67383af8d325 17,19-23,30,38
+  s_7f857100432e15::t_926833fbd54119 29,35
+debug_router/native/test/socket_server_status_unittest.cc
+  s_7f857100432e15::t_1dd822811c1ed0 180-190,300-336,342
+  s_7f857100432e15::t_e5ad04c7e6831e 221,224,227,250-251
+debug_router/native/socket/work_thread_executor.h
+  s_7f857100432e15::t_92f7572498129c 26-29
+debug_router/native/log/logging.cc
+  s_7f857100432e15::t_4d5e99f00317c7 38
+  s_7f857100432e15::t_4d77f9640ad17e 57
+test/e2e_test/android_example/scripts/debug_router_usb_benchmark.py
+  s_7f857100432e15::t_aa4eed1ad488f2 498
+  s_7f857100432e15::t_bc6fde69e363ab 676-680
+  s_7f857100432e15::t_02006e36f2bf92 217-338
+  s_7f857100432e15::t_9f28e46c2cb299 380-385,464-467,470-471
+  s_7f857100432e15::t_197626a748ee60 545-550,555,568,570-573,575-576,591-602,615-621,624-625,638-639
+debug_router/native/test/logging_unittest.cc
+  s_7f857100432e15::t_1dd822811c1ed0 1-12,18-22,24-28
+  s_7f857100432e15::t_4d5e99f00317c7 13-17
+  s_7f857100432e15::t_1ab984eeb7a488 23
+debug_router/native/socket/usb_client.cc
+  s_7f857100432e15::t_21c20f75eb28b3 69,79,86-87,438,443-445,468-469,490-491
+  s_7f857100432e15::t_4d5e99f00317c7 96-98,133,139-142,149,160,167-170,199-201
+  s_7f857100432e15::t_926833fbd54119 285-292
+  s_7f857100432e15::t_4d77f9640ad17e 405-408,442,478-485
+debug_router/native/socket/socket_server_api.cc
+  s_7f857100432e15::t_4d77f9640ad17e 65-67
+debug_router/native/test/BUILD.gn
+  s_7f857100432e15::t_1dd822811c1ed0 75
+  s_7f857100432e15::t_92f7572498129c 79
+debug_router/native/socket/usb_client.h
+  s_7f857100432e15::t_21c20f75eb28b3 8-9,95-96
+  s_7f857100432e15::t_4d77f9640ad17e 36,48,108-109
+  s_7f857100432e15::t_4d5e99f00317c7 105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "13c60992f6890a82f6dbdc41c1fc8e8c446cb53b",
+  "prompts": {},
+  "sessions": {
+    "s_7f857100432e15": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ef8d9-c3ee-7000-8d8b-0b82fc6a397f",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Qingyu Wang <wangqingyu.c0l1n@bytedance.com>"
+    }
+  }
+}
