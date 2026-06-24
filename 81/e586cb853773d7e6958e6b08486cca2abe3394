@@ -1,0 +1,23 @@
+debug_router/native/log/logging.cc
+  s_7f857100432e15::t_7be51a9b2b6bca 38,57
+debug_router/native/test/logging_unittest.cc
+  s_7f857100432e15::t_7be51a9b2b6bca 1-28
+debug_router/native/test/BUILD.gn
+  s_7f857100432e15::t_7be51a9b2b6bca 75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "81e586cb853773d7e6958e6b08486cca2abe3394",
+  "prompts": {},
+  "sessions": {
+    "s_7f857100432e15": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ef8d9-c3ee-7000-8d8b-0b82fc6a397f",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Qingyu Wang <wangqingyu.c0l1n@bytedance.com>"
+    }
+  }
+}
