@@ -260,6 +260,8 @@ void SocketServer::Disconnect() {
     auto clients = DrainClients();
     StopClients(clients.pending_clients);
     StopClients(clients.active_clients);
+    NotifyStoppedActiveClients(clients.active_clients, kDisconnected, 0,
+                               "SocketServer disconnected");
   });
 }
 
