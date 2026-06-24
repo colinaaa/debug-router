@@ -4,6 +4,8 @@
 
 #include <atomic>
 #include <thread>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "debug_router/native/core/debug_router_core.h"
@@ -11,6 +13,7 @@
 #include "debug_router/native/core/debug_router_session_handler.h"
 #include "debug_router/native/protocol/protocol.h"
 #include "gtest/gtest.h"
+#include "json/reader.h"
 
 namespace debugrouter {
 namespace core {
@@ -44,6 +47,7 @@ class ContextRecordingTransceiver final : public MessageTransceiver {
       override {
     context_sent = data;
     sent_context = context;
+    context_sends.push_back({data, context});
   }
   ConnectionType GetType() override { return ConnectionType::kUsb; }
   void StartServer() override {}
@@ -52,6 +56,9 @@ class ContextRecordingTransceiver final : public MessageTransceiver {
   std::string legacy_sent;
   std::string context_sent;
   std::shared_ptr<MessageTransceiverContext> sent_context;
+  std::vector<
+      std::pair<std::string, std::shared_ptr<MessageTransceiverContext>>>
+      context_sends;
 };
 
 class DebugRouterCoreConcurrencyTest : public ::testing::Test {
@@ -147,6 +154,38 @@ TEST_F(DebugRouterCoreConcurrencyTest, OnMessageUsesPerTransceiverContextState) 
 
   core_->OnClosed(transceiver);
   EXPECT_EQ(core_->TransceiverContextCountForTest(), 0U);
+  SetCurrentTransceiver(previous_transceiver);
+  SetCurrentConnectionState(previous_state);
+}
+
+TEST_F(DebugRouterCoreConcurrencyTest, SendDataBroadcastsPerProcessorContext) {
+  auto previous_transceiver = GetCurrentTransceiver();
+  ConnectionState previous_state = GetCurrentConnectionState();
+  auto transceiver = std::make_shared<ContextRecordingTransceiver>();
+  auto first_context = std::make_shared<TestMessageContext>();
+  auto second_context = std::make_shared<TestMessageContext>();
+  SetCurrentTransceiver(transceiver);
+  SetCurrentConnectionState(CONNECTED);
+  core_->GetProcessorContextForTest(first_context).client_id = 501;
+  core_->GetProcessorContextForTest(second_context).client_id = 502;
+
+  core_->SendData("payload", protocol::kRemoteDebugProtocolBodyData4CDP, 7, -1,
+                  false);
+
+  ASSERT_EQ(transceiver->context_sends.size(), 2U);
+  std::unordered_map<std::shared_ptr<MessageTransceiverContext>, uint32_t>
+      sent_client_ids;
+  for (const auto &send : transceiver->context_sends) {
+    Json::Value root;
+    Json::Reader reader;
+    ASSERT_TRUE(reader.parse(send.first, root));
+    sent_client_ids[send.second] =
+        root[protocol::kKeyData][protocol::kKeySender].asUInt();
+  }
+  EXPECT_EQ(sent_client_ids[first_context], 501U);
+  EXPECT_EQ(sent_client_ids[second_context], 502U);
+
+  core_->OnClosed(transceiver);
   SetCurrentTransceiver(previous_transceiver);
   SetCurrentConnectionState(previous_state);
 }

@@ -294,6 +294,18 @@ void DebugRouterCore::SendAsync(const std::string &message) {
 void DebugRouterCore::SendData(const std::string &data, const std::string &type,
                                int32_t session, int32_t mark, bool is_object) {
   if (connection_state_.load(std::memory_order_relaxed) == CONNECTED) {
+    if (!transceiver_contexts_.empty()) {
+      for (const auto &pair : transceiver_contexts_) {
+        auto processor_context = processor_contexts_.find(pair.first);
+        if (processor_context == processor_contexts_.end()) {
+          continue;
+        }
+        std::string message = processor_->WrapCustomizedMessage(
+            type, session, data, mark, is_object, processor_context->second);
+        Send(message, pair.second);
+      }
+      return;
+    }
     std::string message =
         processor_->WrapCustomizedMessage(type, session, data, mark, is_object);
     Send(message);
