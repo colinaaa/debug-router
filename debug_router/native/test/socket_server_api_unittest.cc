@@ -1,0 +1,161 @@
+// Copyright 2026 The Lynx Authors. All rights reserved.
+// Licensed under the Apache License Version 2.0 that can be found in the
+// LICENSE file in the root directory of this source tree.
+
+#include "debug_router/native/socket/socket_server_api.h"
+
+#ifndef _WIN32
+
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <chrono>
+#include <condition_variable>
+#include <functional>
+#include <mutex>
+#include <thread>
+#include <vector>
+
+#include "debug_router/native/core/debug_router_core.h"
+#include "debug_router/native/socket/usb_client.h"
+#include "gtest/gtest.h"
+
+namespace debugrouter {
+namespace socket_server {
+namespace {
+
+class RecordingListener final : public SocketServerConnectionListener {
+ public:
+  void OnInit(int32_t code, const std::string &info) override {}
+
+  void OnStatusChanged(ConnectionStatus status, int32_t code,
+                       const std::string &info) override {
+    std::lock_guard<std::mutex> lock(mutex_);
+    statuses_.push_back(status);
+    condition_.notify_all();
+  }
+
+  void OnMessage(const std::string &message) override {
+    std::lock_guard<std::mutex> lock(mutex_);
+    messages_.push_back(message);
+    condition_.notify_all();
+  }
+
+  bool WaitForStatusCount(size_t count) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return condition_.wait_for(lock, std::chrono::seconds(1),
+                               [&]() { return statuses_.size() >= count; });
+  }
+
+  size_t StatusCount() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return statuses_.size();
+  }
+
+  ConnectionStatus StatusAt(size_t index) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return statuses_[index];
+  }
+
+ private:
+  std::mutex mutex_;
+  std::condition_variable condition_;
+  std::vector<ConnectionStatus> statuses_;
+  std::vector<std::string> messages_;
+};
+
+class TestSocketServer : public SocketServer {
+ public:
+  using SocketServer::SocketServer;
+
+  void AddPendingClientForTest(const std::shared_ptr<UsbClient> &client) {
+    AddPendingClient(client);
+  }
+
+  size_t ActiveClientCount() { return ActiveClientCountForTest(); }
+
+  size_t PendingClientCount() { return PendingClientCountForTest(); }
+
+ private:
+  void Start() override {}
+  int GetErrorMessage() override { return 0; }
+  void CloseSocket(int socket_fd) override {}
+};
+
+std::shared_ptr<UsbClient> MakeUsbClient(std::vector<int> *peer_sockets) {
+  int sockets[2] = {-1, -1};
+  EXPECT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets), 0);
+  peer_sockets->push_back(sockets[1]);
+  return std::make_shared<UsbClient>(sockets[0]);
+}
+
+bool WaitUntil(const std::function<bool()> &predicate) {
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::seconds(1);
+  while (std::chrono::steady_clock::now() < deadline) {
+    if (predicate()) {
+      return true;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  return predicate();
+}
+
+TEST(SocketServerApiTestSuite,
+     TracksMultipleActiveClientsWithAggregateLifecycleNotifications) {
+  core::DebugRouterCore::GetInstance();
+
+  std::vector<int> peer_sockets;
+  auto listener = std::make_shared<RecordingListener>();
+  auto server = std::make_shared<TestSocketServer>(listener);
+  server->StartServer();
+  auto first_client = MakeUsbClient(&peer_sockets);
+  auto second_client = MakeUsbClient(&peer_sockets);
+
+  server->AddPendingClientForTest(first_client);
+  server->AddPendingClientForTest(second_client);
+  EXPECT_EQ(server->PendingClientCount(), 2U);
+
+  server->HandleOnOpenStatus(first_client, ConnectionStatus::kConnected,
+                             "first connected");
+  ASSERT_TRUE(listener->WaitForStatusCount(1));
+  EXPECT_EQ(listener->StatusAt(0), ConnectionStatus::kConnected);
+  EXPECT_TRUE(WaitUntil([&]() {
+    return server->ActiveClientCount() == 1U &&
+           server->PendingClientCount() == 1U;
+  }));
+
+  server->HandleOnOpenStatus(second_client, ConnectionStatus::kConnected,
+                             "second connected");
+  EXPECT_TRUE(WaitUntil([&]() {
+    return server->ActiveClientCount() == 2U &&
+           server->PendingClientCount() == 0U;
+  }));
+  EXPECT_EQ(listener->StatusCount(), 1U);
+
+  EXPECT_TRUE(server->Broadcast("broadcast"));
+  EXPECT_TRUE(server->Send(first_client, "targeted"));
+
+  server->HandleOnCloseStatus(first_client, ConnectionStatus::kDisconnected, 0,
+                              "first closed");
+  EXPECT_TRUE(WaitUntil([&]() { return server->ActiveClientCount() == 1U; }));
+  EXPECT_EQ(listener->StatusCount(), 1U);
+  EXPECT_FALSE(server->Send(first_client, "closed client"));
+
+  server->HandleOnCloseStatus(second_client, ConnectionStatus::kDisconnected, 0,
+                              "second closed");
+  ASSERT_TRUE(listener->WaitForStatusCount(2));
+  EXPECT_EQ(listener->StatusAt(1), ConnectionStatus::kDisconnected);
+  EXPECT_TRUE(WaitUntil([&]() { return server->ActiveClientCount() == 0U; }));
+
+  server->StopServer();
+  for (int peer_socket : peer_sockets) {
+    close(peer_socket);
+  }
+}
+
+}  // namespace
+}  // namespace socket_server
+}  // namespace debugrouter
+
+#endif  // _WIN32

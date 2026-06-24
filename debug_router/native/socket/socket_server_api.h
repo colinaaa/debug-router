@@ -5,10 +5,15 @@
 #ifndef DEBUGROUTER_NATIVE_SOCKET_SOCKET_SERVER_API_H
 #define DEBUGROUTER_NATIVE_SOCKET_SOCKET_SERVER_API_H
 
+#include <atomic>
+#include <condition_variable>
+#include <memory>
 #include <mutex>
 #include <queue>
 #include <string>
 #include <thread>
+#include <unordered_set>
+#include <vector>
 
 #include "debug_router/native/log/logging.h"
 #include "debug_router/native/socket/count_down_latch.h"
@@ -34,6 +39,9 @@ class SocketServer : public std::enable_shared_from_this<SocketServer> {
 
   void Init();
   bool Send(const std::string &message);
+  bool Send(const std::shared_ptr<UsbClient> &client,
+            const std::string &message);
+  bool Broadcast(const std::string &message);
   void Disconnect();
 
   void HandleOnOpenStatus(std::shared_ptr<UsbClient> client, int32_t code,
@@ -58,26 +66,40 @@ class SocketServer : public std::enable_shared_from_this<SocketServer> {
 
   virtual void Start() = 0;
   virtual int GetErrorMessage() = 0;
-  virtual void CloseSocket(int socket_fd) = 0;
+  virtual void CloseSocket(int socket_fd);
   void Close();
   void NotifyInit(int32_t code, const std::string &info);
+  void AddPendingClient(const std::shared_ptr<UsbClient> &client);
 
   void setEnableServer(bool enable);
+
+#ifdef TESTING
+  size_t ActiveClientCountForTest();
+  size_t PendingClientCountForTest();
+#endif
 
   std::weak_ptr<SocketServerConnectionListener> listener_;
   std::queue<std::string> writer_message_queue_;
   std::condition_variable queue_available_;
   std::unique_ptr<CountDownLatch> latch_;
   std::mutex queue_lock_;
-  std::shared_ptr<UsbClient> usb_client_;
-  std::shared_ptr<UsbClient> temp_usb_client_;
 
   volatile SocketType socket_fd_ = kInvalidSocket;
 
  private:
+  using ClientSet = std::unordered_set<std::shared_ptr<UsbClient>>;
+
+  bool HasActiveClient(const std::shared_ptr<UsbClient> &client);
+  std::vector<std::shared_ptr<UsbClient>> ActiveClientsSnapshot();
+  std::vector<std::shared_ptr<UsbClient>> DrainClients();
+  void StopClients(std::vector<std::shared_ptr<UsbClient>> clients);
+
   std::atomic<bool> is_running_{false};
   std::condition_variable running_condition_;
   std::mutex running_mutex_;
+  ClientSet pending_clients_;
+  ClientSet active_clients_;
+  std::mutex clients_mutex_;
 };
 
 // ClientListener
