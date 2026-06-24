@@ -610,16 +610,26 @@ processor::Processor::ClientProtocolContext &
 DebugRouterCore::GetProcessorContext(
     const std::shared_ptr<MessageTransceiverContext> &context) {
   const void *context_key = context ? context->GetContextKey() : nullptr;
+  if (context_key) {
+    transceiver_contexts_[context_key] = context;
+  }
   return processor_contexts_[context_key];
 }
 
-void DebugRouterCore::ClearProcessorContexts() { processor_contexts_.clear(); }
+void DebugRouterCore::ClearProcessorContexts() {
+  processor_contexts_.clear();
+  transceiver_contexts_.clear();
+}
 
 #ifdef TESTING
 processor::Processor::ClientProtocolContext &
 DebugRouterCore::GetProcessorContextForTest(
     const std::shared_ptr<MessageTransceiverContext> &context) {
   return GetProcessorContext(context);
+}
+
+size_t DebugRouterCore::TransceiverContextCountForTest() {
+  return transceiver_contexts_.size();
 }
 #endif
 

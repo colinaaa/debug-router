@@ -156,6 +156,7 @@ class DebugRouterCore : public MessageTransceiverDelegate {
 #ifdef TESTING
   processor::Processor::ClientProtocolContext &GetProcessorContextForTest(
       const std::shared_ptr<MessageTransceiverContext> &context);
+  size_t TransceiverContextCountForTest();
 #endif
 
   DebugRouterCore(const DebugRouterCore &) = delete;
@@ -212,6 +213,8 @@ class DebugRouterCore : public MessageTransceiverDelegate {
   std::shared_ptr<MessageTransceiverContext> current_message_context_;
   std::unordered_map<const void *, processor::Processor::ClientProtocolContext>
       processor_contexts_;
+  std::unordered_map<const void *, std::shared_ptr<MessageTransceiverContext>>
+      transceiver_contexts_;
   // Caches the last server state requested by UpdateServerState().
   std::atomic<bool> server_running_{false};
   // Ensures UpdateServerState() has at most one executor task in flight.

@@ -141,10 +141,12 @@ TEST_F(DebugRouterCoreConcurrencyTest, OnMessageUsesPerTransceiverContextState) 
   core_->OnMessage(InitMessage(401), transceiver, first_context);
   core_->OnMessage(InitMessage(402), transceiver, second_context);
 
+  EXPECT_EQ(core_->TransceiverContextCountForTest(), 2U);
   EXPECT_EQ(core_->GetProcessorContextForTest(first_context).client_id, 401U);
   EXPECT_EQ(core_->GetProcessorContextForTest(second_context).client_id, 402U);
 
   core_->OnClosed(transceiver);
+  EXPECT_EQ(core_->TransceiverContextCountForTest(), 0U);
   SetCurrentTransceiver(previous_transceiver);
   SetCurrentConnectionState(previous_state);
 }
