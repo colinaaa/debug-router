@@ -107,7 +107,7 @@ void SocketServer::HandleOnMessageStatus(std::shared_ptr<UsbClient> client,
       return;
     }
     if (auto listener = listener_.lock()) {
-      listener->OnMessage(message);
+      listener->OnMessage(client, message);
     }
   });
 }

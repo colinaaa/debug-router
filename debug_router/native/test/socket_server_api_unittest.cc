@@ -35,8 +35,10 @@ class RecordingListener final : public SocketServerConnectionListener {
     condition_.notify_all();
   }
 
-  void OnMessage(const std::string &message) override {
+  void OnMessage(std::shared_ptr<UsbClient> client,
+                 const std::string &message) override {
     std::lock_guard<std::mutex> lock(mutex_);
+    message_clients_.push_back(client);
     messages_.push_back(message);
     condition_.notify_all();
   }
@@ -57,10 +59,27 @@ class RecordingListener final : public SocketServerConnectionListener {
     return statuses_[index];
   }
 
+  bool WaitForMessageCount(size_t count) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return condition_.wait_for(lock, std::chrono::seconds(1),
+                               [&]() { return messages_.size() >= count; });
+  }
+
+  std::shared_ptr<UsbClient> MessageClientAt(size_t index) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return message_clients_[index].lock();
+  }
+
+  std::string MessageAt(size_t index) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return messages_[index];
+  }
+
  private:
   std::mutex mutex_;
   std::condition_variable condition_;
   std::vector<ConnectionStatus> statuses_;
+  std::vector<std::weak_ptr<UsbClient>> message_clients_;
   std::vector<std::string> messages_;
 };
 
@@ -135,6 +154,11 @@ TEST(SocketServerApiTestSuite,
 
   EXPECT_TRUE(server->Broadcast("broadcast"));
   EXPECT_TRUE(server->Send(first_client, "targeted"));
+
+  server->HandleOnMessageStatus(second_client, "from second");
+  ASSERT_TRUE(listener->WaitForMessageCount(1));
+  EXPECT_EQ(listener->MessageClientAt(0), second_client);
+  EXPECT_EQ(listener->MessageAt(0), "from second");
 
   server->HandleOnCloseStatus(first_client, ConnectionStatus::kDisconnected, 0,
                               "first closed");
