@@ -215,6 +215,7 @@ class DebugRouterCore : public MessageTransceiverDelegate {
   std::atomic<int> handler_count_;
   std::atomic<WebSocketConnectType> is_first_connect_;
   std::shared_ptr<MessageTransceiverContext> current_message_context_;
+  std::shared_mutex processor_contexts_mutex_;
   std::unordered_map<const void *, processor::Processor::ClientProtocolContext>
       processor_contexts_;
   std::unordered_map<const void *, std::shared_ptr<MessageTransceiverContext>>

@@ -3,6 +3,7 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <atomic>
+#include <mutex>
 #include <thread>
 #include <unordered_map>
 #include <utility>
@@ -48,10 +49,14 @@ class ContextRecordingTransceiver final : public MessageTransceiver {
  public:
   bool Connect(const std::string &url) override { return false; }
   void Disconnect() override {}
-  void Send(const std::string &data) override { legacy_sent = data; }
+  void Send(const std::string &data) override {
+    std::lock_guard<std::mutex> lock(send_mutex);
+    legacy_sent = data;
+  }
   void Send(const std::string &data,
             const std::shared_ptr<MessageTransceiverContext> &context)
       override {
+    std::lock_guard<std::mutex> lock(send_mutex);
     context_sent = data;
     sent_context = context;
     context_sends.push_back({data, context});
@@ -66,6 +71,7 @@ class ContextRecordingTransceiver final : public MessageTransceiver {
   std::vector<
       std::pair<std::string, std::shared_ptr<MessageTransceiverContext>>>
       context_sends;
+  std::mutex send_mutex;
 };
 
 class DebugRouterCoreConcurrencyTest : public ::testing::Test {
@@ -75,12 +81,14 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
     ClearSlots();
     ClearGlobalHandlers();
     ClearSessionHandlers();
+    core_->ClearProcessorContexts();
   }
 
   void TearDown() override {
     ClearSlots();
     ClearGlobalHandlers();
     ClearSessionHandlers();
+    core_->ClearProcessorContexts();
   }
 
   void ClearSlots() {
@@ -227,6 +235,45 @@ TEST_F(DebugRouterCoreConcurrencyTest, ContextCloseRemovesProcessorContext) {
   Json::Reader reader;
   ASSERT_TRUE(reader.parse(transceiver->context_sends[0].first, root));
   EXPECT_EQ(root[protocol::kKeyData][protocol::kKeySender].asUInt(), 702U);
+
+  core_->OnClosed(transceiver);
+  SetCurrentTransceiver(previous_transceiver);
+  SetCurrentConnectionState(previous_state);
+}
+
+TEST_F(DebugRouterCoreConcurrencyTest, ConcurrentSendDataAndContextUpdates) {
+  auto previous_transceiver = GetCurrentTransceiver();
+  ConnectionState previous_state = GetCurrentConnectionState();
+  auto transceiver = std::make_shared<ContextRecordingTransceiver>();
+  auto context = std::make_shared<TestMessageContext>();
+  SetCurrentTransceiver(transceiver);
+  SetCurrentConnectionState(CONNECTED);
+
+  std::atomic<bool> start(false);
+  std::thread updater([&]() {
+    while (!start.load(std::memory_order_acquire)) {
+      std::this_thread::yield();
+    }
+    for (uint32_t i = 0; i < 32; ++i) {
+      core_->OnMessage(InitMessage(800 + i), transceiver, context);
+    }
+  });
+  std::thread sender([&]() {
+    while (!start.load(std::memory_order_acquire)) {
+      std::this_thread::yield();
+    }
+    for (uint32_t i = 0; i < 32; ++i) {
+      core_->SendData("payload", protocol::kRemoteDebugProtocolBodyData4CDP, 7,
+                      -1, false);
+    }
+  });
+
+  start.store(true, std::memory_order_release);
+  updater.join();
+  sender.join();
+
+  EXPECT_EQ(core_->TransceiverContextCountForTest(), 1U);
+  EXPECT_GE(core_->GetProcessorContextForTest(context).client_id, 800U);
 
   core_->OnClosed(transceiver);
   SetCurrentTransceiver(previous_transceiver);

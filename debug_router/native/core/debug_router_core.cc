@@ -294,15 +294,27 @@ void DebugRouterCore::SendAsync(const std::string &message) {
 void DebugRouterCore::SendData(const std::string &data, const std::string &type,
                                int32_t session, int32_t mark, bool is_object) {
   if (connection_state_.load(std::memory_order_relaxed) == CONNECTED) {
-    if (!transceiver_contexts_.empty()) {
+    std::vector<std::pair<std::shared_ptr<MessageTransceiverContext>,
+                          processor::Processor::ClientProtocolContext>>
+        context_snapshots;
+    bool has_transceiver_contexts = false;
+    {
+      std::shared_lock lock(processor_contexts_mutex_);
+      has_transceiver_contexts = !transceiver_contexts_.empty();
+      context_snapshots.reserve(transceiver_contexts_.size());
       for (const auto &pair : transceiver_contexts_) {
         auto processor_context = processor_contexts_.find(pair.first);
         if (processor_context == processor_contexts_.end()) {
           continue;
         }
+        context_snapshots.emplace_back(pair.second, processor_context->second);
+      }
+    }
+    if (has_transceiver_contexts) {
+      for (const auto &pair : context_snapshots) {
         std::string message = processor_->WrapCustomizedMessage(
-            type, session, data, mark, is_object, processor_context->second);
-        Send(message, pair.second);
+            type, session, data, mark, is_object, pair.second);
+        Send(message, pair.first);
       }
       return;
     }
@@ -602,7 +614,21 @@ void DebugRouterCore::OnMessage(
   };
   ScopedMessageContext scoped_context(this, context);
   if (context && context->GetContextKey()) {
-    processor_->Process(message, GetProcessorContext(context));
+    const void *context_key = context->GetContextKey();
+    processor::Processor::ClientProtocolContext processor_context;
+    {
+      std::unique_lock lock(processor_contexts_mutex_);
+      transceiver_contexts_[context_key] = context;
+      processor_context = processor_contexts_[context_key];
+    }
+    processor_->Process(message, processor_context);
+    {
+      std::unique_lock lock(processor_contexts_mutex_);
+      if (transceiver_contexts_.find(context_key) !=
+          transceiver_contexts_.end()) {
+        processor_contexts_[context_key] = processor_context;
+      }
+    }
   } else {
     processor_->Process(message);
   }
@@ -626,6 +652,7 @@ void DebugRouterCore::OnContextClosed(
     return;
   }
   const void *context_key = context->GetContextKey();
+  std::unique_lock lock(processor_contexts_mutex_);
   processor_contexts_.erase(context_key);
   transceiver_contexts_.erase(context_key);
 }
@@ -634,6 +661,7 @@ processor::Processor::ClientProtocolContext &
 DebugRouterCore::GetProcessorContext(
     const std::shared_ptr<MessageTransceiverContext> &context) {
   const void *context_key = context ? context->GetContextKey() : nullptr;
+  std::unique_lock lock(processor_contexts_mutex_);
   if (context_key) {
     transceiver_contexts_[context_key] = context;
   }
@@ -641,24 +669,37 @@ DebugRouterCore::GetProcessorContext(
 }
 
 void DebugRouterCore::ClearProcessorContexts() {
+  std::unique_lock lock(processor_contexts_mutex_);
   processor_contexts_.clear();
   transceiver_contexts_.clear();
 }
 
 void DebugRouterCore::FlushSessionListToAllContexts() {
-  if (transceiver_contexts_.empty()) {
+  std::vector<std::pair<std::shared_ptr<MessageTransceiverContext>,
+                        processor::Processor::ClientProtocolContext>>
+      context_snapshots;
+  bool has_transceiver_contexts = false;
+  {
+    std::shared_lock lock(processor_contexts_mutex_);
+    has_transceiver_contexts = !transceiver_contexts_.empty();
+    context_snapshots.reserve(transceiver_contexts_.size());
+    for (const auto &pair : transceiver_contexts_) {
+      auto processor_context = processor_contexts_.find(pair.first);
+      if (processor_context == processor_contexts_.end()) {
+        continue;
+      }
+      context_snapshots.emplace_back(pair.second, processor_context->second);
+    }
+  }
+  if (!has_transceiver_contexts) {
     processor_->FlushSessionList();
     return;
   }
 
   auto previous_message_context = current_message_context_;
-  for (const auto &pair : transceiver_contexts_) {
-    auto processor_context = processor_contexts_.find(pair.first);
-    if (processor_context == processor_contexts_.end()) {
-      continue;
-    }
-    current_message_context_ = pair.second;
-    processor_->FlushSessionList(processor_context->second);
+  for (const auto &pair : context_snapshots) {
+    current_message_context_ = pair.first;
+    processor_->FlushSessionList(pair.second);
   }
   current_message_context_ = previous_message_context;
 }
@@ -671,6 +712,7 @@ DebugRouterCore::GetProcessorContextForTest(
 }
 
 size_t DebugRouterCore::TransceiverContextCountForTest() {
+  std::shared_lock lock(processor_contexts_mutex_);
   return transceiver_contexts_.size();
 }
 #endif
