@@ -9,6 +9,7 @@
 #include "debug_router/native/core/debug_router_core.h"
 #include "debug_router/native/core/debug_router_global_handler.h"
 #include "debug_router/native/core/debug_router_session_handler.h"
+#include "debug_router/native/protocol/protocol.h"
 #include "gtest/gtest.h"
 
 namespace debugrouter {
@@ -106,6 +107,11 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
   DebugRouterCore *core_;
 };
 
+std::string InitMessage(protocol::RemoteDebugPrococolClientId client_id) {
+  return protocol::RemoteDebugProtocol::Stringify(
+      protocol::RemoteDebugProtocol::CreateProtocolBody4Init(client_id));
+}
+
 TEST_F(DebugRouterCoreConcurrencyTest, SendUsesTransceiverContextWhenProvided) {
   auto previous_transceiver = GetCurrentTransceiver();
   ConnectionState previous_state = GetCurrentConnectionState();
@@ -121,6 +127,26 @@ TEST_F(DebugRouterCoreConcurrencyTest, SendUsesTransceiverContextWhenProvided) {
   EXPECT_EQ(transceiver->context_sent, "context payload");
   EXPECT_EQ(transceiver->sent_context, context);
   EXPECT_TRUE(transceiver->legacy_sent.empty());
+}
+
+TEST_F(DebugRouterCoreConcurrencyTest, OnMessageUsesPerTransceiverContextState) {
+  auto previous_transceiver = GetCurrentTransceiver();
+  ConnectionState previous_state = GetCurrentConnectionState();
+  auto transceiver = std::make_shared<ContextRecordingTransceiver>();
+  auto first_context = std::make_shared<TestMessageContext>();
+  auto second_context = std::make_shared<TestMessageContext>();
+  SetCurrentTransceiver(transceiver);
+  SetCurrentConnectionState(CONNECTED);
+
+  core_->OnMessage(InitMessage(401), transceiver, first_context);
+  core_->OnMessage(InitMessage(402), transceiver, second_context);
+
+  EXPECT_EQ(core_->GetProcessorContextForTest(first_context).client_id, 401U);
+  EXPECT_EQ(core_->GetProcessorContextForTest(second_context).client_id, 402U);
+
+  core_->OnClosed(transceiver);
+  SetCurrentTransceiver(previous_transceiver);
+  SetCurrentConnectionState(previous_state);
 }
 
 TEST_F(DebugRouterCoreConcurrencyTest, ConcurrentAddSameGlobalHandler) {

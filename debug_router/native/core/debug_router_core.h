@@ -22,14 +22,12 @@
 #include "debug_router/native/core/debug_router_state_listener.h"
 #include "debug_router/native/core/message_transceiver.h"
 #include "debug_router/native/core/native_slot.h"
+#include "debug_router/native/processor/processor.h"
 #include "debug_router/native/report/debug_router_native_report.h"
 
 namespace debugrouter {
 namespace thread {
 class DebugRouterExecutor;
-}
-namespace processor {
-class Processor;
 }
 
 namespace core {
@@ -155,6 +153,11 @@ class DebugRouterCore : public MessageTransceiverDelegate {
   bool isActiveSession(int32_t session_id);
   bool isEnableAllSessions();
 
+#ifdef TESTING
+  processor::Processor::ClientProtocolContext &GetProcessorContextForTest(
+      const std::shared_ptr<MessageTransceiverContext> &context);
+#endif
+
   DebugRouterCore(const DebugRouterCore &) = delete;
   DebugRouterCore &operator=(const DebugRouterCore &) = delete;
   DebugRouterCore(DebugRouterCore &&) = delete;
@@ -200,10 +203,15 @@ class DebugRouterCore : public MessageTransceiverDelegate {
   void TryToReconnect();
   void NotifyConnectStateByMessage(ConnectionState state);
   std::string GetConnectionStateMsg(ConnectionState state);
+  processor::Processor::ClientProtocolContext &GetProcessorContext(
+      const std::shared_ptr<MessageTransceiverContext> &context);
+  void ClearProcessorContexts();
   std::atomic<int32_t> usb_port_;
   std::atomic<int> handler_count_;
   std::atomic<WebSocketConnectType> is_first_connect_;
   std::shared_ptr<MessageTransceiverContext> current_message_context_;
+  std::unordered_map<const void *, processor::Processor::ClientProtocolContext>
+      processor_contexts_;
   // Caches the last server state requested by UpdateServerState().
   std::atomic<bool> server_running_{false};
   // Ensures UpdateServerState() has at most one executor task in flight.

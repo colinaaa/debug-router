@@ -202,6 +202,7 @@ void DebugRouterCore::Disconnect() {
       current_transceiver_->Disconnect();
       current_transceiver_ = nullptr;
     }
+    ClearProcessorContexts();
   }
 }
 
@@ -457,6 +458,7 @@ void DebugRouterCore::OnClosed(
   }
   connection_state_.store(DISCONNECTED, std::memory_order_relaxed);
   current_transceiver_ = nullptr;
+  ClearProcessorContexts();
   NotifyConnectStateByMessage(DISCONNECTED);
   if (transceiver->GetType() == ConnectionType::kUsb ||
       (transceiver->GetType() == ConnectionType::kWebSocket &&
@@ -528,6 +530,7 @@ void DebugRouterCore::OnFailure(
   }
   connection_state_.store(DISCONNECTED, std::memory_order_relaxed);
   current_transceiver_ = nullptr;
+  ClearProcessorContexts();
   NotifyConnectStateByMessage(DISCONNECTED);
 
   if (transceiver->GetType() == ConnectionType::kUsb ||
@@ -586,7 +589,11 @@ void DebugRouterCore::OnMessage(
     std::shared_ptr<MessageTransceiverContext> previous_context_;
   };
   ScopedMessageContext scoped_context(this, context);
-  processor_->Process(message);
+  if (context && context->GetContextKey()) {
+    processor_->Process(message, GetProcessorContext(context));
+  } else {
+    processor_->Process(message);
+  }
 
   std::vector<std::shared_ptr<DebugRouterStateListener>> listeners;
   {
@@ -598,6 +605,23 @@ void DebugRouterCore::OnMessage(
     listener->OnMessage(message);
   }
 }
+
+processor::Processor::ClientProtocolContext &
+DebugRouterCore::GetProcessorContext(
+    const std::shared_ptr<MessageTransceiverContext> &context) {
+  const void *context_key = context ? context->GetContextKey() : nullptr;
+  return processor_contexts_[context_key];
+}
+
+void DebugRouterCore::ClearProcessorContexts() { processor_contexts_.clear(); }
+
+#ifdef TESTING
+processor::Processor::ClientProtocolContext &
+DebugRouterCore::GetProcessorContextForTest(
+    const std::shared_ptr<MessageTransceiverContext> &context) {
+  return GetProcessorContext(context);
+}
+#endif
 
 DebugRouterCore::~DebugRouterCore() {
   // TODO(zhoumingsong.smile): Stop websocketClient's thread
