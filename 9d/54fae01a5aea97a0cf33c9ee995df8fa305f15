@@ -1,0 +1,47 @@
+debug_router/native/socket/win/socket_server_win.cc
+  s_f8ca517d81410b::t_b1bd65d55f0e49 95
+debug_router/native/test/socket_server_accept_benchmark.cc
+  s_f8ca517d81410b::t_23242dbd4f39ab 180-181,212-213
+  s_f8ca517d81410b::t_f287bafcd944d3 58
+  s_f8ca517d81410b::t_19224b929449f5 20,424
+  s_f8ca517d81410b::t_4346f3dce36ab3 34,161-179,184-186,196-197,199,207-208,218
+  s_f8ca517d81410b::t_247e77fa345d8d 53,136-148,157-160,182-183,187-191,194-195,198,200-206,209-211,214-217,242-245,248,303,312-313,317,323-326,333-337,339,359,368,370,402-403,448,450
+  s_f8ca517d81410b::t_6e965fa3793efa 6
+  s_f8ca517d81410b::t_6b79413b7d29e9 344-345,349-354
+  s_f8ca517d81410b::t_a4eb4df5fc7886 60-64,86-95,122,428
+  s_f8ca517d81410b::t_edf0423286651f 262-263,304-305,462-464
+  s_f8ca517d81410b::t_c29f99ce48d531 125-129
+  s_f8ca517d81410b::t_44f1a99e998933 1-4,7-14,16-19,21-33,35-39,43-52,54-57,59,65-85,96-121,123-124,130-135,149-156,192-193,219-220,222-241,310-311,338,340-343,346-348,355-358,360-367,369,371-401,404-421,425-427,429-440,445-447,449,451-457,465,468-470,472,479-489
+  s_f8ca517d81410b::t_17675abe630eee 422-423,466-467,473
+  s_f8ca517d81410b::t_26075e0bdfdce2 5
+  s_f8ca517d81410b::t_c9d771782c8ca6 250-254,285-287,294,297,300,306,308-309,327-331
+  s_f8ca517d81410b::t_9682ff8e4aea35 15,40-42,221,246-247,249,255-261,264-284,288-293,295-296,298-299,301-302,307,314-316,318-322,332,441-444,458-461,471,474-478
+debug_router/native/socket/socket_server_api.cc
+  s_f8ca517d81410b::t_da0a6ac51556a6 28-30,33-38,42,90-98,102-103,109-119,128-136,140,144-154,190-197,199-203,236-243,246-247,269-279,281-282
+  s_f8ca517d81410b::t_b1bd65d55f0e49 235
+  s_f8ca517d81410b::t_17675abe630eee 47-65,70-84,244-245,249-264
+debug_router/native/socket/socket_server_api.h
+  s_f8ca517d81410b::t_da0a6ac51556a6 17,66,77-78
+  s_f8ca517d81410b::t_b1bd65d55f0e49 65
+debug_router/native/socket/posix/socket_server_posix.cc
+  s_f8ca517d81410b::t_b1bd65d55f0e49 100
+  s_f8ca517d81410b::t_da0a6ac51556a6 99,103-104
+debug_router/native/test/BUILD.gn
+  s_f8ca517d81410b::t_44f1a99e998933 79-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "9d54fae01a5aea97a0cf33c9ee995df8fa305f15",
+  "prompts": {},
+  "sessions": {
+    "s_f8ca517d81410b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ef961-91fa-74d3-9a0e-ad238dfeddd3",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Qingyu Wang <wangqingyu.c0l1n@bytedance.com>"
+    }
+  }
+}
