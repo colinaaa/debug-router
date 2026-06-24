@@ -1,0 +1,23 @@
+debug_router/native/socket/socket_server_api.cc
+  s_7f857100432e15::t_c7584cd8dc50fa 31-33,37,54-55,58-60,64
+debug_router/native/test/socket_server_status_unittest.cc
+  s_7f857100432e15::t_5018b7a548fd44 60-96,159-191,257-292
+debug_router/native/socket/socket_server_api.h
+  s_7f857100432e15::t_c7584cd8dc50fa 74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "c425e50203162a6d59275a17dfb169a2da9c5eb6",
+  "prompts": {},
+  "sessions": {
+    "s_7f857100432e15": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ef8d9-c3ee-7000-8d8b-0b82fc6a397f",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Qingyu Wang <wangqingyu.c0l1n@bytedance.com>"
+    }
+  }
+}
