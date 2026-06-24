@@ -214,6 +214,7 @@ void DebugRouterCore::Disconnect() {
       current_transceiver_->Disconnect();
       current_transceiver_ = nullptr;
     }
+    connection_state_.store(DISCONNECTED, std::memory_order_relaxed);
     ClearProcessorContexts();
   }
 }

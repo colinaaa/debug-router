@@ -305,6 +305,27 @@ TEST_F(DebugRouterCoreConcurrencyTest, ContextCloseRemovesProcessorContext) {
   SetCurrentConnectionState(previous_state);
 }
 
+TEST_F(DebugRouterCoreConcurrencyTest,
+       DisconnectMarksDisconnectedAndClearsContexts) {
+  auto previous_transceiver = GetCurrentTransceiver();
+  ConnectionState previous_state = GetCurrentConnectionState();
+  auto transceiver = std::make_shared<ContextRecordingTransceiver>();
+  auto context = std::make_shared<TestMessageContext>();
+  SetCurrentTransceiver(transceiver);
+  SetCurrentConnectionState(CONNECTED);
+  core_->GetProcessorContextForTest(context).client_id = 704;
+  ASSERT_EQ(core_->TransceiverContextCountForTest(), 1U);
+
+  core_->Disconnect();
+
+  EXPECT_EQ(GetCurrentConnectionState(), DISCONNECTED);
+  EXPECT_EQ(GetCurrentTransceiver(), nullptr);
+  EXPECT_EQ(core_->TransceiverContextCountForTest(), 0U);
+
+  SetCurrentTransceiver(previous_transceiver);
+  SetCurrentConnectionState(previous_state);
+}
+
 TEST_F(DebugRouterCoreConcurrencyTest, ConcurrentSendDataAndContextUpdates) {
   auto previous_transceiver = GetCurrentTransceiver();
   ConnectionState previous_state = GetCurrentConnectionState();
