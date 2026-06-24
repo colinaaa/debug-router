@@ -90,11 +90,18 @@ class SocketServer : public std::enable_shared_from_this<SocketServer> {
 
  private:
   using ClientSet = std::unordered_set<std::shared_ptr<UsbClient>>;
+  struct DrainedClients {
+    std::vector<std::shared_ptr<UsbClient>> pending_clients;
+    std::vector<std::shared_ptr<UsbClient>> active_clients;
+  };
 
   bool HasActiveClient(const std::shared_ptr<UsbClient> &client);
   std::vector<std::shared_ptr<UsbClient>> ActiveClientsSnapshot();
-  std::vector<std::shared_ptr<UsbClient>> DrainClients();
+  DrainedClients DrainClients();
   void StopClients(std::vector<std::shared_ptr<UsbClient>> clients);
+  void NotifyStoppedActiveClients(
+      const std::vector<std::shared_ptr<UsbClient>> &clients,
+      ConnectionStatus status, int32_t code, const std::string &reason);
 
   std::atomic<bool> is_running_{false};
   std::condition_variable running_condition_;

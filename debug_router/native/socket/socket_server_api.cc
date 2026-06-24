@@ -203,7 +203,11 @@ void SocketServer::StopServer() {
   }
 
   Close();
-  StopClients(DrainClients());
+  auto clients = DrainClients();
+  StopClients(clients.pending_clients);
+  StopClients(clients.active_clients);
+  NotifyStoppedActiveClients(clients.active_clients, kDisconnected, 0,
+                             "SocketServer stopped");
 }
 
 void SocketServer::ThreadFunc(std::shared_ptr<SocketServer> socket_server) {
@@ -253,13 +257,17 @@ void SocketServer::CloseSocket(int socket_fd) {
 void SocketServer::Disconnect() {
   thread::DebugRouterExecutor::GetInstance().Post([=]() {
     LOGI("SocketServerApi Disconnect: stop all clients.");
-    StopClients(DrainClients());
+    auto clients = DrainClients();
+    StopClients(clients.pending_clients);
+    StopClients(clients.active_clients);
   });
 }
 
 SocketServer::~SocketServer() {
   LOGI("SocketServer::~SocketServer");
-  StopClients(DrainClients());
+  auto clients = DrainClients();
+  StopClients(clients.pending_clients);
+  StopClients(clients.active_clients);
   Close();
 }
 
@@ -277,15 +285,18 @@ std::vector<std::shared_ptr<UsbClient>> SocketServer::ActiveClientsSnapshot() {
                                                  active_clients_.end());
 }
 
-std::vector<std::shared_ptr<UsbClient>> SocketServer::DrainClients() {
-  std::vector<std::shared_ptr<UsbClient>> clients;
+SocketServer::DrainedClients SocketServer::DrainClients() {
+  DrainedClients clients;
   {
     std::lock_guard<std::mutex> lock(clients_mutex_);
-    clients.reserve(pending_clients_.size() + active_clients_.size());
-    clients.insert(clients.end(), pending_clients_.begin(),
-                   pending_clients_.end());
-    clients.insert(clients.end(), active_clients_.begin(),
-                   active_clients_.end());
+    clients.pending_clients.reserve(pending_clients_.size());
+    clients.active_clients.reserve(active_clients_.size());
+    clients.pending_clients.insert(clients.pending_clients.end(),
+                                   pending_clients_.begin(),
+                                   pending_clients_.end());
+    clients.active_clients.insert(clients.active_clients.end(),
+                                  active_clients_.begin(),
+                                  active_clients_.end());
     pending_clients_.clear();
     active_clients_.clear();
   }
@@ -297,6 +308,20 @@ void SocketServer::StopClients(std::vector<std::shared_ptr<UsbClient>> clients) 
     if (client) {
       client->Stop();
     }
+  }
+}
+
+void SocketServer::NotifyStoppedActiveClients(
+    const std::vector<std::shared_ptr<UsbClient>> &clients,
+    ConnectionStatus status, int32_t code, const std::string &reason) {
+  if (clients.empty()) {
+    return;
+  }
+  if (auto listener = listener_.lock()) {
+    for (const auto &client : clients) {
+      listener->OnClientClosed(client);
+    }
+    listener->OnStatusChanged(status, code, reason);
   }
 }
 

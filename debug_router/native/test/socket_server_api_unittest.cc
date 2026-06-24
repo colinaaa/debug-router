@@ -375,6 +375,46 @@ TEST(SocketServerApiTestSuite,
   }
 }
 
+TEST(SocketServerApiTestSuite, StopServerNotifiesClosedActiveClients) {
+  core::DebugRouterCore::GetInstance();
+
+  std::vector<int> peer_sockets;
+  auto listener = std::make_shared<RecordingListener>();
+  auto server = std::make_shared<TestSocketServer>(listener);
+  server->StartServer();
+  auto first_client = MakeUsbClient(&peer_sockets);
+  auto second_client = MakeUsbClient(&peer_sockets);
+
+  server->AddPendingClientForTest(first_client);
+  server->AddPendingClientForTest(second_client);
+  server->HandleOnOpenStatus(first_client, ConnectionStatus::kConnected,
+                             "first connected");
+  server->HandleOnOpenStatus(second_client, ConnectionStatus::kConnected,
+                             "second connected");
+  ASSERT_TRUE(WaitUntil([&]() { return server->ActiveClientCount() == 2U; }));
+  ASSERT_TRUE(listener->WaitForStatusCount(1));
+
+  server->StopServer();
+
+  ASSERT_TRUE(listener->WaitForClosedClientCount(2));
+  auto first_closed_client = listener->ClosedClientAt(0);
+  auto second_closed_client = listener->ClosedClientAt(1);
+  EXPECT_TRUE((first_closed_client == first_client &&
+               second_closed_client == second_client) ||
+              (first_closed_client == second_client &&
+               second_closed_client == first_client));
+  ASSERT_TRUE(listener->WaitForStatusCount(2));
+  EXPECT_EQ(listener->StatusAt(1), ConnectionStatus::kDisconnected);
+  EXPECT_TRUE(WaitUntil([&]() {
+    return server->ActiveClientCount() == 0U &&
+           server->PendingClientCount() == 0U;
+  }));
+
+  for (int peer_socket : peer_sockets) {
+    close(peer_socket);
+  }
+}
+
 }  // namespace
 }  // namespace socket_server
 }  // namespace debugrouter
