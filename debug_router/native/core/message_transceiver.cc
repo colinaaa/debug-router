@@ -8,9 +8,30 @@ namespace debugrouter {
 namespace core {
 MessageTransceiver::MessageTransceiver() {}
 
+void MessageTransceiverDelegate::OnMessage(
+    const std::string &message,
+    const std::shared_ptr<MessageTransceiver> &transceiver,
+    const std::shared_ptr<MessageTransceiverContext> &context) {
+  (void)context;
+  OnMessage(message, transceiver);
+}
+
+void MessageTransceiver::Send(
+    const std::string &data,
+    const std::shared_ptr<MessageTransceiverContext> &context) {
+  (void)context;
+  Send(data);
+}
+
 void MessageTransceiver::HandleReceivedMessage(const std::string &message) {
+  HandleReceivedMessage(message, nullptr);
+}
+
+void MessageTransceiver::HandleReceivedMessage(
+    const std::string &message,
+    const std::shared_ptr<MessageTransceiverContext> &context) {
   if (delegate_) {
-    delegate_->OnMessage(message, shared_from_this());
+    delegate_->OnMessage(message, shared_from_this(), context);
   }
 }
 
