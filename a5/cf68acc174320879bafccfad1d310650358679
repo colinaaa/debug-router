@@ -1,0 +1,29 @@
+debug_router/native/test/BUILD.gn
+  s_7f857100432e15::t_875ed34b9b9e53 79
+debug_router/native/socket/work_thread_executor.cc
+  s_7f857100432e15::t_875ed34b9b9e53 11-17,82-84,110-117,119
+debug_router/native/socket/usb_client.h
+  s_7f857100432e15::t_875ed34b9b9e53 8-9,95-96
+debug_router/native/test/usb_client_resource_unittest.cc
+  s_7f857100432e15::t_875ed34b9b9e53 1-43
+debug_router/native/socket/usb_client.cc
+  s_7f857100432e15::t_875ed34b9b9e53 69,79,86-87,285-292,438,443,468-469,490-491
+debug_router/native/socket/work_thread_executor.h
+  s_7f857100432e15::t_875ed34b9b9e53 26-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "a5cf68acc174320879bafccfad1d310650358679",
+  "prompts": {},
+  "sessions": {
+    "s_7f857100432e15": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ef8d9-c3ee-7000-8d8b-0b82fc6a397f",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Qingyu Wang <wangqingyu.c0l1n@bytedance.com>"
+    }
+  }
+}
