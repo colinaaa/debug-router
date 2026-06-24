@@ -18,6 +18,7 @@ class MessageTransceiver;
 class MessageTransceiverContext {
  public:
   virtual ~MessageTransceiverContext() = default;
+  virtual const void *GetTypeId() const;
 };
 
 class MessageTransceiverDelegate {

@@ -9,6 +9,24 @@
 namespace debugrouter {
 namespace net {
 
+SocketServerClientContext::SocketServerClientContext(
+    std::shared_ptr<debugrouter::socket_server::UsbClient> socket_client)
+    : socket_client_(socket_client) {}
+
+const void *SocketServerClientContext::GetTypeId() const {
+  return ContextTypeId();
+}
+
+const void *SocketServerClientContext::ContextTypeId() {
+  static int type_id = 0;
+  return &type_id;
+}
+
+std::shared_ptr<debugrouter::socket_server::UsbClient>
+SocketServerClientContext::GetSocketClient() const {
+  return socket_client_.lock();
+}
+
 class ConnectionListener
     : public debugrouter::socket_server::SocketServerConnectionListener {
  public:
@@ -60,7 +78,9 @@ class ConnectionListener
         LOGE("OnMessage: delegate == nullptr, client is already offline.");
         return;
       }
-      delegate->OnMessage(message, client);
+      delegate->OnMessage(
+          message, client,
+          std::make_shared<SocketServerClientContext>(socket_client));
     }
   }
 
@@ -88,6 +108,32 @@ void SocketServerClient::Send(const std::string &data) {
   socket_server_->Send(data);
 }
 
+void SocketServerClient::Send(
+    const std::string &data,
+    const std::shared_ptr<core::MessageTransceiverContext> &context) {
+  if (!context) {
+    Send(data);
+    return;
+  }
+  auto socket_client = GetSocketClientFromContext(context);
+  if (!socket_server_ || !socket_client) {
+    LOGI("SocketServerClient::Send: socket context is no longer active.");
+    return;
+  }
+  socket_server_->Send(socket_client, data);
+}
+
+std::shared_ptr<debugrouter::socket_server::UsbClient>
+SocketServerClient::GetSocketClientFromContext(
+    const std::shared_ptr<core::MessageTransceiverContext> &context) {
+  if (!context ||
+      context->GetTypeId() != SocketServerClientContext::ContextTypeId()) {
+    return nullptr;
+  }
+  auto *socket_context = static_cast<SocketServerClientContext *>(context.get());
+  return socket_context->GetSocketClient();
+}
+
 void SocketServerClient::HandleReceivedMessage(const std::string &message) {
   // empty
 }
@@ -103,6 +149,20 @@ void SocketServerClient::StopServer() {
     socket_server_->StopServer();
   }
 }
+
+#ifdef TESTING
+std::shared_ptr<debugrouter::socket_server::UsbClient>
+SocketServerClient::GetSocketClientFromContextForTest(
+    const std::shared_ptr<core::MessageTransceiverContext> &context) {
+  return GetSocketClientFromContext(context);
+}
+
+void SocketServerClient::SetSocketServerForTest(
+    const std::shared_ptr<debugrouter::socket_server::SocketServer>
+        &socket_server) {
+  socket_server_ = socket_server;
+}
+#endif
 
 }  // namespace net
 }  // namespace debugrouter

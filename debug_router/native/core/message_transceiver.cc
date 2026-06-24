@@ -8,6 +8,8 @@ namespace debugrouter {
 namespace core {
 MessageTransceiver::MessageTransceiver() {}
 
+const void *MessageTransceiverContext::GetTypeId() const { return nullptr; }
+
 void MessageTransceiverDelegate::OnMessage(
     const std::string &message,
     const std::shared_ptr<MessageTransceiver> &transceiver,
