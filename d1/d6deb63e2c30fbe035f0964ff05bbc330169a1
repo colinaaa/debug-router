@@ -1,0 +1,23 @@
+debug_router/native/test/BUILD.gn
+  s_7f857100432e15::t_728a1369fe11b4 76
+debug_router/native/test/socket_server_status_unittest.cc
+  s_7f857100432e15::t_a996594c4cf344 70-71
+  s_7f857100432e15::t_728a1369fe11b4 1-5,7-8,10-69,72-92
+  s_7f857100432e15::t_828e178a25488f 6,9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "d1d6deb63e2c30fbe035f0964ff05bbc330169a1",
+  "prompts": {},
+  "sessions": {
+    "s_7f857100432e15": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ef8d9-c3ee-7000-8d8b-0b82fc6a397f",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Qingyu Wang <wangqingyu.c0l1n@bytedance.com>"
+    }
+  }
+}
