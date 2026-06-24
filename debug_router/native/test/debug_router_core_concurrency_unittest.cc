@@ -116,6 +116,7 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
     ClearGlobalHandlers();
     ClearSessionHandlers();
     ClearMessageHandlers();
+    ClearAppInfo();
     core_->ClearProcessorContexts();
   }
 
@@ -124,6 +125,7 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
     ClearGlobalHandlers();
     ClearSessionHandlers();
     ClearMessageHandlers();
+    ClearAppInfo();
     core_->ClearProcessorContexts();
   }
 
@@ -156,6 +158,16 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
   size_t GetMessageHandlerCount() {
     std::shared_lock lock(core_->message_handler_mutex_);
     return core_->message_handlers_.size();
+  }
+
+  void ClearAppInfo() {
+    std::unique_lock lock(core_->app_info_mutex_);
+    core_->app_info_.clear();
+  }
+
+  size_t GetAppInfoCount() {
+    std::shared_lock lock(core_->app_info_mutex_);
+    return core_->app_info_.size();
   }
 
   size_t GetSessionHandlerCount() {
@@ -429,6 +441,36 @@ TEST_F(DebugRouterCoreConcurrencyTest, MissingAppActionDoesNotMutateHandlers) {
   core_->OnClosed(transceiver);
   SetCurrentTransceiver(previous_transceiver);
   SetCurrentConnectionState(previous_state);
+}
+
+TEST_F(DebugRouterCoreConcurrencyTest, ConcurrentSetAndGetAppInfo) {
+  std::atomic<bool> start(false);
+  std::vector<std::thread> threads;
+  const int kThreadCount = 12;
+
+  for (int i = 0; i < kThreadCount; ++i) {
+    threads.emplace_back([&, i]() {
+      while (!start.load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+      }
+      std::string key = "key_" + std::to_string(i);
+      std::string value = "value_" + std::to_string(i);
+      core_->SetAppInfo(key, value);
+      EXPECT_EQ(core_->GetAppInfoByKey(key), value);
+    });
+  }
+
+  start.store(true, std::memory_order_release);
+  for (auto &thread : threads) {
+    thread.join();
+  }
+
+  EXPECT_EQ(GetAppInfoCount(), static_cast<size_t>(kThreadCount));
+  for (int i = 0; i < kThreadCount; ++i) {
+    std::string key = "key_" + std::to_string(i);
+    std::string value = "value_" + std::to_string(i);
+    EXPECT_EQ(core_->GetAppInfoByKey(key), value);
+  }
 }
 
 TEST_F(DebugRouterCoreConcurrencyTest,

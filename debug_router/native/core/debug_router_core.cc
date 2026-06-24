@@ -39,6 +39,7 @@ class MessageHandlerCore : public processor::MessageHandler {
   }
 
   std::unordered_map<std::string, std::string> GetClientInfo() override {
+    std::shared_lock lock(DebugRouterCore::GetInstance().app_info_mutex_);
     return DebugRouterCore::GetInstance().app_info_;
   }
 
@@ -915,6 +916,7 @@ bool DebugRouterCore::IsConnected() {
 
 void DebugRouterCore::SetAppInfo(
     const std::unordered_map<std::string, std::string> &app_info) {
+  std::unique_lock lock(app_info_mutex_);
   for (auto it = app_info.begin(); it != app_info.end(); ++it) {
     app_info_[it->first] = it->second;
   }
@@ -922,10 +924,12 @@ void DebugRouterCore::SetAppInfo(
 
 void DebugRouterCore::SetAppInfo(const std::string &key,
                                  const std::string &value) {
+  std::unique_lock lock(app_info_mutex_);
   app_info_[key] = value;
 }
 
 std::string DebugRouterCore::GetAppInfoByKey(const std::string &key) {
+  std::shared_lock lock(app_info_mutex_);
   auto it = app_info_.find(key);
   if (it != app_info_.end()) {
     return it->second;
