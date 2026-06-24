@@ -207,6 +207,7 @@ class DebugRouterCore : public MessageTransceiverDelegate {
   processor::Processor::ClientProtocolContext &GetProcessorContext(
       const std::shared_ptr<MessageTransceiverContext> &context);
   void ClearProcessorContexts();
+  void FlushSessionListToAllContexts();
   std::atomic<int32_t> usb_port_;
   std::atomic<int> handler_count_;
   std::atomic<WebSocketConnectType> is_first_connect_;

@@ -35,6 +35,13 @@ class TestSessionHandler : public DebugRouterSessionHandler {
                  int session_id) override {}
 };
 
+class TestNativeSlot final : public NativeSlot {
+ public:
+  TestNativeSlot() : NativeSlot("test", "test://slot") {}
+  void OnMessage(const std::string &message,
+                 const std::string &type) override {}
+};
+
 class TestMessageContext final : public MessageTransceiverContext {};
 
 class ContextRecordingTransceiver final : public MessageTransceiver {
@@ -65,13 +72,21 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
  protected:
   void SetUp() override {
     core_ = &DebugRouterCore::GetInstance();
+    ClearSlots();
     ClearGlobalHandlers();
     ClearSessionHandlers();
   }
 
   void TearDown() override {
+    ClearSlots();
     ClearGlobalHandlers();
     ClearSessionHandlers();
+  }
+
+  void ClearSlots() {
+    std::unique_lock lock(core_->slots_mutex_);
+    core_->slots_.clear();
+    core_->max_session_id_ = 0;
   }
 
   void ClearGlobalHandlers() {
@@ -184,6 +199,38 @@ TEST_F(DebugRouterCoreConcurrencyTest, SendDataBroadcastsPerProcessorContext) {
   }
   EXPECT_EQ(sent_client_ids[first_context], 501U);
   EXPECT_EQ(sent_client_ids[second_context], 502U);
+
+  core_->OnClosed(transceiver);
+  SetCurrentTransceiver(previous_transceiver);
+  SetCurrentConnectionState(previous_state);
+}
+
+TEST_F(DebugRouterCoreConcurrencyTest,
+       PlugBroadcastsSessionListPerProcessorContext) {
+  auto previous_transceiver = GetCurrentTransceiver();
+  ConnectionState previous_state = GetCurrentConnectionState();
+  auto transceiver = std::make_shared<ContextRecordingTransceiver>();
+  auto first_context = std::make_shared<TestMessageContext>();
+  auto second_context = std::make_shared<TestMessageContext>();
+  SetCurrentTransceiver(transceiver);
+  SetCurrentConnectionState(CONNECTED);
+  core_->GetProcessorContextForTest(first_context).client_id = 601;
+  core_->GetProcessorContextForTest(second_context).client_id = 602;
+
+  core_->Plug(std::make_shared<TestNativeSlot>());
+
+  ASSERT_EQ(transceiver->context_sends.size(), 2U);
+  std::unordered_map<std::shared_ptr<MessageTransceiverContext>, uint32_t>
+      sent_client_ids;
+  for (const auto &send : transceiver->context_sends) {
+    Json::Value root;
+    Json::Reader reader;
+    ASSERT_TRUE(reader.parse(send.first, root));
+    sent_client_ids[send.second] =
+        root[protocol::kKeyData][protocol::kKeySender].asUInt();
+  }
+  EXPECT_EQ(sent_client_ids[first_context], 601U);
+  EXPECT_EQ(sent_client_ids[second_context], 602U);
 
   core_->OnClosed(transceiver);
   SetCurrentTransceiver(previous_transceiver);

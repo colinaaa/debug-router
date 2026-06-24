@@ -330,7 +330,7 @@ int32_t DebugRouterCore::Plug(const std::shared_ptr<core::NativeSlot> &slot) {
   }
   LOGI("plug session: " << max_session_id_);
   if (connection_state_.load(std::memory_order_relaxed) == CONNECTED) {
-    processor_->FlushSessionList();
+    FlushSessionListToAllContexts();
   }
   NotifyConnectStateByMessage(GetConnectionState());
   {
@@ -371,7 +371,7 @@ void DebugRouterCore::Pull(int32_t session_id_) {
     slots_.erase(session_id_);
   }
   if (connection_state_.load(std::memory_order_relaxed) == CONNECTED) {
-    processor_->FlushSessionList();
+    FlushSessionListToAllContexts();
   }
   {
     std::vector<DebugRouterSessionHandler *> handlers;
@@ -631,6 +631,24 @@ DebugRouterCore::GetProcessorContext(
 void DebugRouterCore::ClearProcessorContexts() {
   processor_contexts_.clear();
   transceiver_contexts_.clear();
+}
+
+void DebugRouterCore::FlushSessionListToAllContexts() {
+  if (transceiver_contexts_.empty()) {
+    processor_->FlushSessionList();
+    return;
+  }
+
+  auto previous_message_context = current_message_context_;
+  for (const auto &pair : transceiver_contexts_) {
+    auto processor_context = processor_contexts_.find(pair.first);
+    if (processor_context == processor_contexts_.end()) {
+      continue;
+    }
+    current_message_context_ = pair.second;
+    processor_->FlushSessionList(processor_context->second);
+  }
+  current_message_context_ = previous_message_context;
 }
 
 #ifdef TESTING
