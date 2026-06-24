@@ -20,6 +20,13 @@ void MessageTransceiverDelegate::OnMessage(
   OnMessage(message, transceiver);
 }
 
+void MessageTransceiverDelegate::OnContextClosed(
+    const std::shared_ptr<MessageTransceiver> &transceiver,
+    const std::shared_ptr<MessageTransceiverContext> &context) {
+  (void)transceiver;
+  (void)context;
+}
+
 void MessageTransceiver::Send(
     const std::string &data,
     const std::shared_ptr<MessageTransceiverContext> &context) {

@@ -37,6 +37,9 @@ class MessageTransceiverDelegate {
       const std::string &message,
       const std::shared_ptr<MessageTransceiver> &transceiver,
       const std::shared_ptr<MessageTransceiverContext> &context);
+  virtual void OnContextClosed(
+      const std::shared_ptr<MessageTransceiver> &transceiver,
+      const std::shared_ptr<MessageTransceiverContext> &context);
   virtual void OnInit(const std::shared_ptr<MessageTransceiver> &transceiver,
                       int32_t code, const std::string &info) = 0;
 };

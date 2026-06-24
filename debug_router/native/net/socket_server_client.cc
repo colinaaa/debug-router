@@ -38,7 +38,7 @@ class ConnectionListener
       : client_(client) {}
   virtual ~ConnectionListener() = default;
   // LOGI error_code here.
-  void OnInit(int32_t code, const std::string &info) {
+  void OnInit(int32_t code, const std::string &info) override {
     LOGI("OnInit: code :" << code << ", info:" << info);
     if (auto client = client_.lock()) {
       core::MessageTransceiverDelegate *delegate = client->delegate();
@@ -51,7 +51,7 @@ class ConnectionListener
   }
 
   void OnStatusChanged(debugrouter::socket_server::ConnectionStatus status,
-                       int32_t code, const std::string &info) {
+                       int32_t code, const std::string &info) override {
     if (auto client = client_.lock()) {
       core::MessageTransceiverDelegate *delegate = client->delegate();
       if (delegate == nullptr) {
@@ -74,7 +74,7 @@ class ConnectionListener
 
   void OnMessage(
       std::shared_ptr<debugrouter::socket_server::UsbClient> socket_client,
-      const std::string &message) {
+      const std::string &message) override {
     (void)socket_client;
     if (auto client = client_.lock()) {
       core::MessageTransceiverDelegate *delegate = client->delegate();
@@ -85,6 +85,20 @@ class ConnectionListener
       delegate->OnMessage(
           message, client,
           std::make_shared<SocketServerClientContext>(socket_client));
+    }
+  }
+
+  void OnClientClosed(
+      std::shared_ptr<debugrouter::socket_server::UsbClient> socket_client)
+      override {
+    if (auto client = client_.lock()) {
+      core::MessageTransceiverDelegate *delegate = client->delegate();
+      if (delegate == nullptr) {
+        LOGE("OnClientClosed: delegate == nullptr.");
+        return;
+      }
+      delegate->OnContextClosed(
+          client, std::make_shared<SocketServerClientContext>(socket_client));
     }
   }
 

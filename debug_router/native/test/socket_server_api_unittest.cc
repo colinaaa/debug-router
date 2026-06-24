@@ -43,6 +43,12 @@ class RecordingListener final : public SocketServerConnectionListener {
     condition_.notify_all();
   }
 
+  void OnClientClosed(std::shared_ptr<UsbClient> client) override {
+    std::lock_guard<std::mutex> lock(mutex_);
+    closed_clients_.push_back(client);
+    condition_.notify_all();
+  }
+
   bool WaitForStatusCount(size_t count) {
     std::unique_lock<std::mutex> lock(mutex_);
     return condition_.wait_for(lock, std::chrono::seconds(1),
@@ -75,12 +81,25 @@ class RecordingListener final : public SocketServerConnectionListener {
     return messages_[index];
   }
 
+  bool WaitForClosedClientCount(size_t count) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return condition_.wait_for(
+        lock, std::chrono::seconds(1),
+        [&]() { return closed_clients_.size() >= count; });
+  }
+
+  std::shared_ptr<UsbClient> ClosedClientAt(size_t index) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return closed_clients_[index].lock();
+  }
+
  private:
   std::mutex mutex_;
   std::condition_variable condition_;
   std::vector<ConnectionStatus> statuses_;
   std::vector<std::weak_ptr<UsbClient>> message_clients_;
   std::vector<std::string> messages_;
+  std::vector<std::weak_ptr<UsbClient>> closed_clients_;
 };
 
 class TestSocketServer : public SocketServer {
@@ -162,12 +181,16 @@ TEST(SocketServerApiTestSuite,
 
   server->HandleOnCloseStatus(first_client, ConnectionStatus::kDisconnected, 0,
                               "first closed");
+  ASSERT_TRUE(listener->WaitForClosedClientCount(1));
+  EXPECT_EQ(listener->ClosedClientAt(0), first_client);
   EXPECT_TRUE(WaitUntil([&]() { return server->ActiveClientCount() == 1U; }));
   EXPECT_EQ(listener->StatusCount(), 1U);
   EXPECT_FALSE(server->Send(first_client, "closed client"));
 
   server->HandleOnCloseStatus(second_client, ConnectionStatus::kDisconnected, 0,
                               "second closed");
+  ASSERT_TRUE(listener->WaitForClosedClientCount(2));
+  EXPECT_EQ(listener->ClosedClientAt(1), second_client);
   ASSERT_TRUE(listener->WaitForStatusCount(2));
   EXPECT_EQ(listener->StatusAt(1), ConnectionStatus::kDisconnected);
   EXPECT_TRUE(WaitUntil([&]() { return server->ActiveClientCount() == 0U; }));

@@ -117,16 +117,23 @@ void SocketServer::HandleOnCloseStatus(std::shared_ptr<UsbClient> client,
                                        const std::string &reason) {
   thread::DebugRouterExecutor::GetInstance().Post([=]() {
     bool should_notify_disconnected = false;
+    bool should_notify_client_closed = false;
     {
       std::lock_guard<std::mutex> lock(clients_mutex_);
       pending_clients_.erase(client);
       size_t removed_count = active_clients_.erase(client);
+      should_notify_client_closed = removed_count > 0;
       should_notify_disconnected =
           removed_count > 0 && active_clients_.empty();
     }
     LOGI("SocketServerApi HandleOnCloseStatus: close client for OnClose.");
     if (client) {
       client->Stop();
+    }
+    if (should_notify_client_closed) {
+      if (auto listener = listener_.lock()) {
+        listener->OnClientClosed(client);
+      }
     }
     if (should_notify_disconnected) {
       if (auto listener = listener_.lock()) {
@@ -141,15 +148,22 @@ void SocketServer::HandleOnErrorStatus(std::shared_ptr<UsbClient> client,
                                        const std::string &reason) {
   thread::DebugRouterExecutor::GetInstance().Post([=]() {
     bool should_notify_error = false;
+    bool should_notify_client_closed = false;
     {
       std::lock_guard<std::mutex> lock(clients_mutex_);
       pending_clients_.erase(client);
       size_t removed_count = active_clients_.erase(client);
+      should_notify_client_closed = removed_count > 0;
       should_notify_error = removed_count > 0 && active_clients_.empty();
     }
     LOGI("SocketServerApi HandleOnErrorStatus: close client for OnError.");
     if (client) {
       client->Stop();
+    }
+    if (should_notify_client_closed) {
+      if (auto listener = listener_.lock()) {
+        listener->OnClientClosed(client);
+      }
     }
     if (should_notify_error) {
       if (auto listener = listener_.lock()) {

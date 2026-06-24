@@ -205,6 +205,34 @@ TEST_F(DebugRouterCoreConcurrencyTest, SendDataBroadcastsPerProcessorContext) {
   SetCurrentConnectionState(previous_state);
 }
 
+TEST_F(DebugRouterCoreConcurrencyTest, ContextCloseRemovesProcessorContext) {
+  auto previous_transceiver = GetCurrentTransceiver();
+  ConnectionState previous_state = GetCurrentConnectionState();
+  auto transceiver = std::make_shared<ContextRecordingTransceiver>();
+  auto first_context = std::make_shared<TestMessageContext>();
+  auto second_context = std::make_shared<TestMessageContext>();
+  SetCurrentTransceiver(transceiver);
+  SetCurrentConnectionState(CONNECTED);
+  core_->GetProcessorContextForTest(first_context).client_id = 701;
+  core_->GetProcessorContextForTest(second_context).client_id = 702;
+
+  core_->OnContextClosed(transceiver, first_context);
+  EXPECT_EQ(core_->TransceiverContextCountForTest(), 1U);
+  core_->SendData("payload", protocol::kRemoteDebugProtocolBodyData4CDP, 7, -1,
+                  false);
+
+  ASSERT_EQ(transceiver->context_sends.size(), 1U);
+  EXPECT_EQ(transceiver->context_sends[0].second, second_context);
+  Json::Value root;
+  Json::Reader reader;
+  ASSERT_TRUE(reader.parse(transceiver->context_sends[0].first, root));
+  EXPECT_EQ(root[protocol::kKeyData][protocol::kKeySender].asUInt(), 702U);
+
+  core_->OnClosed(transceiver);
+  SetCurrentTransceiver(previous_transceiver);
+  SetCurrentConnectionState(previous_state);
+}
+
 TEST_F(DebugRouterCoreConcurrencyTest,
        PlugBroadcastsSessionListPerProcessorContext) {
   auto previous_transceiver = GetCurrentTransceiver();

@@ -30,6 +30,7 @@ class SocketServerConnectionListener {
                                const std::string &info) = 0;
   virtual void OnMessage(std::shared_ptr<UsbClient> client,
                          const std::string &message) = 0;
+  virtual void OnClientClosed(std::shared_ptr<UsbClient> client) {}
 };
 
 class SocketServer : public std::enable_shared_from_this<SocketServer> {

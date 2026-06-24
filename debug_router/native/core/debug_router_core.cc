@@ -618,6 +618,18 @@ void DebugRouterCore::OnMessage(
   }
 }
 
+void DebugRouterCore::OnContextClosed(
+    const std::shared_ptr<MessageTransceiver> &transceiver,
+    const std::shared_ptr<MessageTransceiverContext> &context) {
+  if (transceiver != current_transceiver_ || !context ||
+      !context->GetContextKey()) {
+    return;
+  }
+  const void *context_key = context->GetContextKey();
+  processor_contexts_.erase(context_key);
+  transceiver_contexts_.erase(context_key);
+}
+
 processor::Processor::ClientProtocolContext &
 DebugRouterCore::GetProcessorContext(
     const std::shared_ptr<MessageTransceiverContext> &context) {
