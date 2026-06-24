@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <thread>
+#include <utility>
 
 #include "debug_router/native/base/no_destructor.h"
 #include "debug_router/native/core/debug_router_config.h"
@@ -121,7 +122,8 @@ class MessageHandlerCore : public processor::MessageHandler {
   }
 
   void SendMessage(const std::string &message) override {
-    DebugRouterCore::GetInstance().Send(message);
+    DebugRouterCore &core = DebugRouterCore::GetInstance();
+    core.Send(message, core.current_message_context_);
   }
 
   void OpenCard(const std::string &url) override {
@@ -270,8 +272,14 @@ void DebugRouterCore::Connect(const std::string &url, const std::string &room,
 }
 
 void DebugRouterCore::Send(const std::string &message) {
+  Send(message, nullptr);
+}
+
+void DebugRouterCore::Send(
+    const std::string &message,
+    const std::shared_ptr<MessageTransceiverContext> &context) {
   if (connection_state_.load(std::memory_order_relaxed) == CONNECTED) {
-    current_transceiver_->Send(message);
+    current_transceiver_->Send(message, context);
   }
 }
 
@@ -550,10 +558,34 @@ void DebugRouterCore::OnFailure(
 void DebugRouterCore::OnMessage(
     const std::string &message,
     const std::shared_ptr<MessageTransceiver> &transceiver) {
+  OnMessage(message, transceiver, nullptr);
+}
+
+void DebugRouterCore::OnMessage(
+    const std::string &message,
+    const std::shared_ptr<MessageTransceiver> &transceiver,
+    const std::shared_ptr<MessageTransceiverContext> &context) {
   if (transceiver != current_transceiver_) {
     return;
   }
   LOGI("DebugRouter OnMessage.");
+  class ScopedMessageContext {
+   public:
+    ScopedMessageContext(
+        DebugRouterCore *core,
+        std::shared_ptr<MessageTransceiverContext> current_context)
+        : core_(core), previous_context_(core->current_message_context_) {
+      core_->current_message_context_ = std::move(current_context);
+    }
+    ~ScopedMessageContext() {
+      core_->current_message_context_ = previous_context_;
+    }
+
+   private:
+    DebugRouterCore *core_;
+    std::shared_ptr<MessageTransceiverContext> previous_context_;
+  };
+  ScopedMessageContext scoped_context(this, context);
   processor_->Process(message);
 
   std::vector<std::shared_ptr<DebugRouterStateListener>> listeners;

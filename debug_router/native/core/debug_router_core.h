@@ -74,6 +74,10 @@ class DebugRouterCore : public MessageTransceiverDelegate {
   virtual void OnMessage(
       const std::string &message,
       const std::shared_ptr<MessageTransceiver> &transceiver) override;
+  virtual void OnMessage(
+      const std::string &message,
+      const std::shared_ptr<MessageTransceiver> &transceiver,
+      const std::shared_ptr<MessageTransceiverContext> &context) override;
 
   virtual void OnInit(const std::shared_ptr<MessageTransceiver> &transceiver,
                       int32_t code, const std::string &info) override;
@@ -85,6 +89,8 @@ class DebugRouterCore : public MessageTransceiverDelegate {
   void DisconnectAsync();
 
   void Send(const std::string &message);
+  void Send(const std::string &message,
+            const std::shared_ptr<MessageTransceiverContext> &context);
 
   void SendAsync(const std::string &message);
 
@@ -197,6 +203,7 @@ class DebugRouterCore : public MessageTransceiverDelegate {
   std::atomic<int32_t> usb_port_;
   std::atomic<int> handler_count_;
   std::atomic<WebSocketConnectType> is_first_connect_;
+  std::shared_ptr<MessageTransceiverContext> current_message_context_;
   // Caches the last server state requested by UpdateServerState().
   std::atomic<bool> server_running_{false};
   // Ensures UpdateServerState() has at most one executor task in flight.

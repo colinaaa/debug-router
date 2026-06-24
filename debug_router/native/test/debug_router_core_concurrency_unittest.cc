@@ -31,6 +31,28 @@ class TestSessionHandler : public DebugRouterSessionHandler {
                  int session_id) override {}
 };
 
+class TestMessageContext final : public MessageTransceiverContext {};
+
+class ContextRecordingTransceiver final : public MessageTransceiver {
+ public:
+  bool Connect(const std::string &url) override { return false; }
+  void Disconnect() override {}
+  void Send(const std::string &data) override { legacy_sent = data; }
+  void Send(const std::string &data,
+            const std::shared_ptr<MessageTransceiverContext> &context)
+      override {
+    context_sent = data;
+    sent_context = context;
+  }
+  ConnectionType GetType() override { return ConnectionType::kUsb; }
+  void StartServer() override {}
+  void StopServer() override {}
+
+  std::string legacy_sent;
+  std::string context_sent;
+  std::shared_ptr<MessageTransceiverContext> sent_context;
+};
+
 class DebugRouterCoreConcurrencyTest : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -64,8 +86,42 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
     return core_->session_handler_map_.size();
   }
 
+  std::shared_ptr<MessageTransceiver> GetCurrentTransceiver() {
+    return core_->current_transceiver_;
+  }
+
+  void SetCurrentTransceiver(
+      const std::shared_ptr<MessageTransceiver> &transceiver) {
+    core_->current_transceiver_ = transceiver;
+  }
+
+  ConnectionState GetCurrentConnectionState() {
+    return core_->connection_state_.load(std::memory_order_relaxed);
+  }
+
+  void SetCurrentConnectionState(ConnectionState state) {
+    core_->connection_state_.store(state, std::memory_order_relaxed);
+  }
+
   DebugRouterCore *core_;
 };
+
+TEST_F(DebugRouterCoreConcurrencyTest, SendUsesTransceiverContextWhenProvided) {
+  auto previous_transceiver = GetCurrentTransceiver();
+  ConnectionState previous_state = GetCurrentConnectionState();
+  auto transceiver = std::make_shared<ContextRecordingTransceiver>();
+  auto context = std::make_shared<TestMessageContext>();
+  SetCurrentTransceiver(transceiver);
+  SetCurrentConnectionState(CONNECTED);
+
+  core_->Send("context payload", context);
+
+  SetCurrentTransceiver(previous_transceiver);
+  SetCurrentConnectionState(previous_state);
+  EXPECT_EQ(transceiver->context_sent, "context payload");
+  EXPECT_EQ(transceiver->sent_context, context);
+  EXPECT_TRUE(transceiver->legacy_sent.empty());
+}
 
 TEST_F(DebugRouterCoreConcurrencyTest, ConcurrentAddSameGlobalHandler) {
   TestGlobalHandler handler;
