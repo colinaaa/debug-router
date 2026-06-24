@@ -17,9 +17,13 @@ TEST(SocketServerClientTestSuite, SocketContextExposesLiveSocketClient) {
   auto socket_client =
       std::make_shared<socket_server::UsbClient>(socket_server::kInvalidSocket);
   auto context = std::make_shared<SocketServerClientContext>(socket_client);
+  auto another_context =
+      std::make_shared<SocketServerClientContext>(socket_client);
 
   EXPECT_EQ(context->GetTypeId(), SocketServerClientContext::ContextTypeId());
   EXPECT_EQ(context->GetSocketClient(), socket_client);
+  EXPECT_EQ(context->GetContextKey(), socket_client.get());
+  EXPECT_EQ(context->GetContextKey(), another_context->GetContextKey());
 }
 
 TEST(SocketServerClientTestSuite, SocketContextDoesNotKeepClientAlive) {

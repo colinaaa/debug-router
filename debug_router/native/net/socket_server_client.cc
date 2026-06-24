@@ -17,6 +17,10 @@ const void *SocketServerClientContext::GetTypeId() const {
   return ContextTypeId();
 }
 
+const void *SocketServerClientContext::GetContextKey() const {
+  return GetSocketClient().get();
+}
+
 const void *SocketServerClientContext::ContextTypeId() {
   static int type_id = 0;
   return &type_id;

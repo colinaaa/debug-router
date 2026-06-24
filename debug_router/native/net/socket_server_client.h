@@ -15,6 +15,7 @@ class SocketServerClientContext : public core::MessageTransceiverContext {
   explicit SocketServerClientContext(
       std::shared_ptr<debugrouter::socket_server::UsbClient> socket_client);
   const void *GetTypeId() const override;
+  const void *GetContextKey() const override;
   std::shared_ptr<debugrouter::socket_server::UsbClient> GetSocketClient()
       const;
   static const void *ContextTypeId();

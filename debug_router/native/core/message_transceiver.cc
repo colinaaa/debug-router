@@ -10,6 +10,8 @@ MessageTransceiver::MessageTransceiver() {}
 
 const void *MessageTransceiverContext::GetTypeId() const { return nullptr; }
 
+const void *MessageTransceiverContext::GetContextKey() const { return this; }
+
 void MessageTransceiverDelegate::OnMessage(
     const std::string &message,
     const std::shared_ptr<MessageTransceiver> &transceiver,
