@@ -174,6 +174,7 @@ class DebugRouterCore : public MessageTransceiverDelegate {
   std::shared_mutex state_listeners_mutex_;
   std::shared_mutex global_handler_mutex_;
   std::shared_mutex session_handler_mutex_;
+  std::shared_mutex message_handler_mutex_;
   friend class MessageHandlerCore;
   std::unordered_map<int32_t, std::shared_ptr<core::NativeSlot> > slots_;
   std::string room_id_;

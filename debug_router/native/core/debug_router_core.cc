@@ -59,8 +59,17 @@ class MessageHandlerCore : public processor::MessageHandler {
 
   std::string HandleAppAction(const std::string &method,
                               const std::string &params) override {
-    DebugRouterMessageHandler *handler =
-        DebugRouterCore::GetInstance().message_handlers_[method];
+    DebugRouterMessageHandler *handler = nullptr;
+    {
+      std::shared_lock lock(DebugRouterCore::GetInstance()
+                                .message_handler_mutex_);
+      const auto &message_handlers =
+          DebugRouterCore::GetInstance().message_handlers_;
+      auto it = message_handlers.find(method);
+      if (it != message_handlers.end()) {
+        handler = it->second;
+      }
+    }
     if (handler) {
       LOGI("DebugRouterCore: handle exists: " << method);
       return handler->Handle(params);
@@ -752,6 +761,7 @@ void DebugRouterCore::AddMessageHandler(DebugRouterMessageHandler *handler) {
     return;
   }
   std::string handler_name = handler->GetName();
+  std::unique_lock lock(message_handler_mutex_);
   if (message_handlers_.find(handler_name) == message_handlers_.end()) {
     LOGI("DebugRouterCore: add a new message handler successfully.");
   } else {
@@ -761,6 +771,7 @@ void DebugRouterCore::AddMessageHandler(DebugRouterMessageHandler *handler) {
 }
 
 bool DebugRouterCore::RemoveMessageHandler(const std::string &handler_name) {
+  std::unique_lock lock(message_handler_mutex_);
   size_t erased_count = message_handlers_.erase(handler_name);
   return erased_count > 0;
 }

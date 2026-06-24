@@ -148,7 +148,15 @@ class DebugRouterCoreConcurrencyTest : public ::testing::Test {
     core_->session_handler_map_.clear();
   }
 
-  void ClearMessageHandlers() { core_->message_handlers_.clear(); }
+  void ClearMessageHandlers() {
+    std::unique_lock lock(core_->message_handler_mutex_);
+    core_->message_handlers_.clear();
+  }
+
+  size_t GetMessageHandlerCount() {
+    std::shared_lock lock(core_->message_handler_mutex_);
+    return core_->message_handlers_.size();
+  }
 
   size_t GetSessionHandlerCount() {
     std::shared_lock lock(core_->session_handler_mutex_);
@@ -376,6 +384,26 @@ TEST_F(DebugRouterCoreConcurrencyTest,
   }
   EXPECT_EQ(sent_contexts_by_sender[901], first_context);
   EXPECT_EQ(sent_contexts_by_sender[902], second_context);
+
+  core_->OnClosed(transceiver);
+  SetCurrentTransceiver(previous_transceiver);
+  SetCurrentConnectionState(previous_state);
+}
+
+TEST_F(DebugRouterCoreConcurrencyTest, MissingAppActionDoesNotMutateHandlers) {
+  auto previous_transceiver = GetCurrentTransceiver();
+  ConnectionState previous_state = GetCurrentConnectionState();
+  auto transceiver = std::make_shared<ContextRecordingTransceiver>();
+  auto context = std::make_shared<TestMessageContext>();
+  SetCurrentTransceiver(transceiver);
+  SetCurrentConnectionState(CONNECTED);
+  core_->GetProcessorContextForTest(context).client_id = 903;
+
+  core_->OnMessage(AppActionMessage(903, 1), transceiver, context);
+
+  EXPECT_EQ(GetMessageHandlerCount(), 0U);
+  ASSERT_EQ(transceiver->context_sends.size(), 1U);
+  EXPECT_EQ(transceiver->context_sends[0].second, context);
 
   core_->OnClosed(transceiver);
   SetCurrentTransceiver(previous_transceiver);
