@@ -1,0 +1,21 @@
+debug_router/native/socket/usb_client.cc
+  s_7f857100432e15::t_c85e7de6c95557 101-103,138,144-147,154,165,172-175,204-206
+debug_router/native/socket/usb_client.h
+  s_7f857100432e15::t_c85e7de6c95557 105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "3a5608b5418162e236dcc38fd3287f09340399b5",
+  "prompts": {},
+  "sessions": {
+    "s_7f857100432e15": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ef8d9-c3ee-7000-8d8b-0b82fc6a397f",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Qingyu Wang <wangqingyu.c0l1n@bytedance.com>"
+    }
+  }
+}

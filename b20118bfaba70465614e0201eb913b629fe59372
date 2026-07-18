@@ -1,0 +1,28 @@
+debug_router/native/test/socket_server_reconnect_benchmark_unittest.cc
+  s_7f857100432e15::t_ada9afa2d0fd02 38
+  s_7f857100432e15::t_a6fe1befa2660c 16
+  s_7f857100432e15::t_d074ae9686e93d 267
+  s_7f857100432e15::t_e79b1f521eaf28 1-15,17-37,39-266,268-273
+debug_router/native/test/BUILD.gn
+  s_7f857100432e15::t_e79b1f521eaf28 75
+test/e2e_test/android_example/scripts/debug_router_usb_benchmark.py
+  s_7f857100432e15::t_10ba232fd506f4 14,32-35,99,236,252-253,255-257,347-468,471-476,499-504
+  s_7f857100432e15::t_e3630fe6bfce07 1-13,15-31,36-98,100-115,120-235,237-251,254,258-346,469-470,477-498,505-518
+  s_7f857100432e15::t_4394445fa64e8a 116-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.11",
+  "base_commit_sha": "b20118bfaba70465614e0201eb913b629fe59372",
+  "prompts": {},
+  "sessions": {
+    "s_7f857100432e15": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ef8d9-c3ee-7000-8d8b-0b82fc6a397f",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Qingyu Wang <wangqingyu.c0l1n@bytedance.com>"
+    }
+  }
+}
